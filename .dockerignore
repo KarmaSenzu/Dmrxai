@@ -1,0 +1,46 @@
+# Dependencies
+node_modules
+npm-debug.log*
+
+# Next build output (akan di-build ulang di image)
+.next
+out
+
+# Environment files (jangan ikut ke image — di-mount lewat compose env)
+.env
+.env.local
+.env.production
+.env.development
+
+# Git
+.git
+.gitignore
+.github
+
+# IDE / OS
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# TypeScript build artifacts
+*.tsbuildinfo
+next-env.d.ts
+
+# Docker files (no recursion needed)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Project meta
+README.md
+LICENSE
+deploy.sh
+ecosystem.config.js
+cloudflared-config/credentials.json
+
+# Logs
+*.log
+
+# 9Router data
+9router-data

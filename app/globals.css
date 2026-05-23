@@ -1,0 +1,224 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-light-bg text-light-text transition-colors duration-200;
+  }
+
+  .dark body {
+    @apply bg-dark-bg text-dark-text;
+  }
+}
+
+@layer components {
+  /* Custom scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-light-border rounded-full;
+  }
+
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-dark-border;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-light-muted;
+  }
+
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-dark-muted;
+  }
+
+  /* Message content styling */
+  .message-content p {
+    @apply mb-3 last:mb-0;
+  }
+
+  .message-content ul,
+  .message-content ol {
+    @apply mb-3 pl-6;
+  }
+
+  .message-content ul {
+    @apply list-disc;
+  }
+
+  .message-content ol {
+    @apply list-decimal;
+  }
+
+  .message-content li {
+    @apply mb-1;
+  }
+
+  .message-content h1 {
+    @apply text-2xl font-bold mb-3 mt-4;
+  }
+
+  .message-content h2 {
+    @apply text-xl font-bold mb-2 mt-3;
+  }
+
+  .message-content h3 {
+    @apply text-lg font-semibold mb-2 mt-3;
+  }
+
+  .message-content blockquote {
+    @apply border-l-4 border-light-border pl-4 italic my-3;
+  }
+
+  .dark .message-content blockquote {
+    @apply border-dark-border;
+  }
+
+  .message-content code:not(pre code) {
+    @apply bg-light-input px-1.5 py-0.5 rounded text-sm font-mono;
+  }
+
+  .dark .message-content code:not(pre code) {
+    @apply bg-dark-input;
+  }
+
+  .message-content pre {
+    @apply bg-light-input rounded-lg p-4 my-3 overflow-x-auto;
+  }
+
+  .dark .message-content pre {
+    @apply bg-[#1a1f2e];
+  }
+
+  .message-content pre code {
+    @apply text-sm font-mono;
+  }
+
+  .message-content a {
+    @apply text-light-accent hover:underline;
+  }
+
+  .dark .message-content a {
+    @apply text-dark-accent;
+  }
+
+  .message-content table {
+    @apply w-full border-collapse my-3;
+  }
+
+  .message-content th,
+  .message-content td {
+    @apply border border-light-border px-3 py-2 text-left;
+  }
+
+  .dark .message-content th,
+  .dark .message-content td {
+    @apply border-dark-border;
+  }
+
+  .message-content th {
+    @apply bg-light-input font-semibold;
+  }
+
+  .dark .message-content th {
+    @apply bg-dark-input;
+  }
+
+  .message-content hr {
+    @apply border-light-border my-4;
+  }
+
+  .dark .message-content hr {
+    @apply border-dark-border;
+  }
+}
+
+@layer utilities {
+  /* Typing animation */
+  .typing-dot {
+    animation: typing 1.4s infinite;
+  }
+
+  .typing-dot:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+
+  .typing-dot:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+
+  @keyframes typing {
+    0%, 60%, 100% {
+      opacity: 0.3;
+      transform: translateY(0);
+    }
+    30% {
+      opacity: 1;
+      transform: translateY(-4px);
+    }
+  }
+
+  /* Fade in animation */
+  .fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Slide in from left */
+  .slide-in-left {
+    animation: slideInLeft 0.2s ease-out;
+  }
+
+  @keyframes slideInLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  /* Shimmer loading effect */
+  .shimmer {
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.05) 50%, transparent 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  /* Pulse glow */
+  .pulse-glow {
+    animation: pulseGlow 2s ease-in-out infinite;
+  }
+
+  @keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.2); }
+    50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+  }
+}

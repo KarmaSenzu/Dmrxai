@@ -1,0 +1,78 @@
+# Dmr x AI — SearXNG configuration
+# https://docs.searxng.org/admin/settings/index.html
+
+use_default_settings: true
+
+general:
+  debug: false
+  instance_name: "dmrxai-search"
+  privacypolicy_url: false
+  donation_url: false
+  contact_url: false
+  enable_metrics: false
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  default_lang: "auto"
+  formats:
+    - html
+    - json
+  max_page: 0
+
+server:
+  # IMPORTANT: each deployment must use a unique secret_key.
+  # Generate one with: openssl rand -hex 32
+  # Copy this file to settings.yml (which is git-ignored) and replace
+  # the placeholder below before starting the SearXNG container.
+  secret_key: "REPLACE_WITH_64_CHAR_HEX_GENERATE_VIA_openssl_rand_hex_32"
+  limiter: false
+  image_proxy: false
+  http_protocol_version: "1.1"
+  method: "POST"
+
+ui:
+  static_use_hash: true
+  default_locale: "en"
+  query_in_title: false
+  infinite_scroll: false
+
+outgoing:
+  request_timeout: 8.0
+  max_request_timeout: 12.0
+  pool_connections: 100
+  pool_maxsize: 20
+  enable_http2: true
+
+# Engines: curated set covering general web, news, code, knowledge, and
+# Indonesian-language sources. API-key-only engines are intentionally
+# omitted. Google is re-enabled; SearXNG handles UA rotation per request.
+engines:
+  - name: duckduckgo
+    disabled: false
+  - name: bing
+    disabled: false
+  - name: brave
+    disabled: false
+  - name: qwant
+    disabled: false
+  - name: wikipedia
+    disabled: false
+  - name: wikidata
+    disabled: false
+  - name: github
+    disabled: false
+  - name: stackoverflow
+    disabled: false
+  - name: reddit
+    disabled: false
+  - name: google
+    disabled: false
+  - name: google news
+    disabled: false
+  - name: startpage
+    disabled: false
+  - name: mojeek
+    disabled: false
+  - name: yahoo
+    disabled: false

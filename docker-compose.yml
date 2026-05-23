@@ -1,0 +1,133 @@
+# Dmr x AI — Docker stack
+# Tunnel: dmrxai.devplay.online + 9router.devplay.online via Cloudflare
+# Run: docker compose up -d --build
+
+name: dmrxai
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: dmrxai-app:latest
+    container_name: dmrxai-app
+    restart: unless-stopped
+    networks: [dmrxai-net]
+    expose:
+      - "3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+      TZ: ${TZ:-Asia/Jakarta}
+      # AI Backend — server-side hardcoded.
+      # User TIDAK bisa override dari Settings UI; semua request keluar
+      # pakai AI_API_KEY ini ke 9router internal.
+      AI_BASE_URL: ${AI_BASE_URL:-http://9router:20128/v1}
+      AI_API_KEY: ${AI_API_KEY:-}
+      # Legacy: usage endpoint (opsional, kosongkan kalau tidak pakai)
+      DMRXAI_API_URL: ${DMRXAI_API_URL:-}
+      SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
+    depends_on:
+      - 9router
+      - searxng
+    cap_drop: [ALL]
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  9router:
+    image: decolua/9router:latest
+    container_name: dmrxai-9router
+    restart: unless-stopped
+    networks: [dmrxai-net]
+    expose:
+      - "20128"
+    environment:
+      DATA_DIR: /app/data
+      TZ: ${TZ:-Asia/Jakarta}
+    volumes:
+      - ./9router-data:/app/data
+    cap_drop:
+      - ALL
+    cap_add:
+      # su-exec di entrypoint butuh CAP_SETGID + CAP_SETUID untuk drop
+      # ke user non-root. CAP_CHOWN untuk chown data dir saat init.
+      - CHOWN
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE
+    security_opt:
+      - no-new-privileges:true
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  searxng:
+    image: searxng/searxng:latest
+    container_name: dmrxai-searxng
+    restart: unless-stopped
+    networks: [dmrxai-net]
+    expose:
+      - "8080"
+    environment:
+      SEARXNG_BASE_URL: http://searxng:8080/
+      INSTANCE_NAME: dmrxai-search
+      TZ: ${TZ:-Asia/Jakarta}
+    volumes:
+      - ./searxng-config:/etc/searxng:rw
+    cap_drop: [ALL]
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE
+    security_opt:
+      - no-new-privileges:true
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: dmrxai-tunnel
+    restart: unless-stopped
+    networks: [dmrxai-net]
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./cloudflared-config:/etc/cloudflared:ro
+    depends_on:
+      - app
+      - 9router
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+networks:
+  dmrxai-net:
+    name: dmrxai-net
+    driver: bridge

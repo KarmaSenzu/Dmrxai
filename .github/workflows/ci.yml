@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit -p .
+
+      - name: Build
+        run: npm run build
+        env:
+          # Build needs these to be set; values are dummies because the build
+          # itself does not call the upstream — only runtime does.
+          AI_BASE_URL: http://localhost:9999/v1
+          AI_API_KEY: dummy-build-time-only
+          NODE_ENV: production
