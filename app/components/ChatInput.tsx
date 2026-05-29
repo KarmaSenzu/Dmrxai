@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo, KeyboardEvent } from "react";
-import { Send, Square, ChevronDown, Check, Brain, Search, ImagePlus, Paperclip, X, FileText, Zap, Globe, Bot, Upload } from "lucide-react";
+import { Send, Square, ChevronDown, Check, Brain, Search, ImagePlus, Paperclip, X, FileText, Zap, Globe, Bot, Upload, Heart } from "lucide-react";
 import { ChatMode, Attachment } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
 import mammoth from "mammoth";
@@ -171,6 +171,7 @@ interface ChatInputProps {
   currentModel: string;
   onModelChange: (model: string) => void;
   fetchedModels?: string[];
+  onOpenDonation?: () => void;
 }
 
 export default function ChatInput({
@@ -181,6 +182,7 @@ export default function ChatInput({
   currentModel,
   onModelChange,
   fetchedModels = [],
+  onOpenDonation,
 }: ChatInputProps) {
   const [input, setInput] = useState("");
   const [showModelPicker, setShowModelPicker] = useState(false);
@@ -838,9 +840,10 @@ export default function ChatInput({
     <div className="border-t border-light-border dark:border-dark-border bg-light-bg dark:bg-dark-bg p-4">
       <div className="max-w-3xl mx-auto">
         {/* Model Selector */}
-        <div className="relative mb-2" ref={modelPickerRef}>
-          <button
-            onClick={() => setShowModelPicker(!showModelPicker)}
+        <div className="flex items-center gap-2 mb-2">
+          <div className="relative" ref={modelPickerRef}>
+            <button
+              onClick={() => setShowModelPicker(!showModelPicker)}
             disabled={disabled}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-light-input dark:bg-dark-input border border-light-border dark:border-dark-border text-light-text dark:text-dark-text hover:bg-light-hover dark:hover:bg-dark-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -925,6 +928,16 @@ export default function ChatInput({
               </div>
             </div>
           )}
+          </div>
+          <button
+            type="button"
+            onClick={() => onOpenDonation?.()}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors"
+            title="Dukung server dmrxai"
+          >
+            <Heart size={13} />
+            <span>Bantu</span>
+          </button>
         </div>
 
         {/* Input Area */}

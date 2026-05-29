@@ -1,7 +1,7 @@
 "use client";
 
 import { Conversation } from "@/lib/types";
-import { Plus, MessageSquare, Trash2, Settings, Sun, Moon, X, Menu, Eraser, Image as ImageIcon, Cpu, Lock, LogOut, Sparkles } from "lucide-react";
+import { Plus, MessageSquare, Trash2, Settings, Sun, Moon, X, Menu, Eraser, Image as ImageIcon, Cpu, Lock, LogOut, Sparkles, Heart } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
 
@@ -16,6 +16,7 @@ interface SidebarProps {
   onClearAll: () => void;
   onOpenSettings: () => void;
   onOpenModels: () => void;
+  onOpenDonation?: () => void;
   onLogout: () => void;
   theme: "dark" | "light";
   onToggleTheme: () => void;
@@ -32,6 +33,7 @@ export default function Sidebar({
   onClearAll,
   onOpenSettings,
   onOpenModels,
+  onOpenDonation,
   onLogout,
   theme,
   onToggleTheme,
@@ -223,6 +225,16 @@ export default function Sidebar({
         >
           {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
           <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
+        </button>
+        <button
+          onClick={() => {
+            onOpenDonation?.();
+            setIsOpen(false);
+          }}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 border border-emerald-500/20 hover:bg-emerald-500/10 transition-colors"
+        >
+          <Heart size={16} />
+          <span>Dukung Server</span>
         </button>
         <button
           onClick={onLogout}
