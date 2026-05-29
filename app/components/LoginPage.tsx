@@ -18,6 +18,7 @@ import {
   Heart,
   ExternalLink,
   Clock,
+  Rocket,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -46,6 +47,7 @@ interface ComparisonRow {
 
 const COMPARISON_ROWS: ComparisonRow[] = [
   { feature: "Harga per bulan", dmrxai: "GRATIS", chatgpt: "$20", claude: "$20", gemini: "$20" },
+  { feature: "Claude Opus 4.8 (Terbaru)", dmrxai: "yes", chatgpt: "no", claude: "partial", gemini: "no" },
   { feature: "Claude Opus 4.7", dmrxai: "yes", chatgpt: "no", claude: "yes", gemini: "no" },
   { feature: "Claude Sonnet 4.6", dmrxai: "yes", chatgpt: "no", claude: "yes", gemini: "no" },
   { feature: "GPT-4o / GPT-5", dmrxai: "partial", chatgpt: "yes", claude: "no", gemini: "no" },
@@ -81,7 +83,7 @@ const FEATURES: FeatureItem[] = [
   {
     icon: Brain,
     title: "Multi Model AI",
-    desc: "Pilih dari 50+ model: Claude Opus 4.7, Sonnet 4.6, Haiku, GPT, Gemini, Llama, Qwen, DeepSeek, dan lainnya.",
+    desc: "Pilih dari 50+ model: Claude Opus 4.8 (terbaru), Opus 4.7, Sonnet 4.6, Haiku, GPT, Gemini, Llama, Qwen, DeepSeek, dan lainnya.",
   },
   {
     icon: Globe,
@@ -178,9 +180,15 @@ export default function LoginPage({ onStart, theme, onToggleTheme }: LoginPagePr
       {/* Hero */}
       <section className="px-6 py-16 lg:py-24">
         <div className="max-w-5xl mx-auto text-center space-y-6">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs font-semibold">
-            <Zap size={12} />
-            <span>100% GRATIS</span>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs font-semibold">
+              <Zap size={12} />
+              <span>100% GRATIS</span>
+            </div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500/15 to-orange-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-semibold">
+              <Sparkles size={12} />
+              <span>Opus 4.8 Baru</span>
+            </div>
           </div>
           <h1 className="text-4xl lg:text-6xl font-bold tracking-tight leading-tight">
             AI Premium yang Sama Pintarnya
@@ -190,7 +198,7 @@ export default function LoginPage({ onStart, theme, onToggleTheme }: LoginPagePr
             </span>
           </h1>
           <p className="text-lg lg:text-xl text-light-muted dark:text-dark-muted max-w-3xl mx-auto leading-relaxed">
-            Akses Claude Opus 4.7, GPT, Gemini, dan model AI terbaik lainnya dengan fitur lengkap web search, analisis dokumen PDF/Excel, visualisasi chart, diagram ERD, vision, dan multi-step tool calling. Semua gratis.
+            Akses Claude Opus 4.8 (terbaru), GPT, Gemini, dan model AI terbaik lainnya dengan fitur lengkap web search, analisis dokumen PDF/Excel, visualisasi chart, diagram ERD, vision, dan multi-step tool calling. Semua gratis.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
             <button
@@ -315,6 +323,31 @@ export default function LoginPage({ onStart, theme, onToggleTheme }: LoginPagePr
                 </div>
               );
             })}
+          </div>
+        </div>
+      </section>
+
+      {/* Coming soon: AI App Builder teaser */}
+      <section className="px-6 py-12">
+        <div className="max-w-3xl mx-auto">
+          <div className="rounded-2xl border border-violet-500/20 bg-gradient-to-br from-violet-500/5 to-blue-500/5 p-6 lg:p-8">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-violet-500/15 to-blue-500/15 border border-violet-500/30 text-violet-700 dark:text-violet-300 text-xs font-semibold">
+              <Rocket size={12} />
+              <span>Segera Hadir • Next Update</span>
+            </div>
+            <h3 className="text-2xl font-bold mt-4 mb-2">AI App Builder</h3>
+            <p className="text-sm text-light-muted dark:text-dark-muted leading-relaxed mb-5 max-w-2xl">
+              dmrxai sedang mengembangkan fitur AI App Builder. Cukup deskripsikan aplikasi yang kamu mau,
+              dmrxai akan menuliskan kodenya dan menampilkan preview-nya langsung dari ponsel. Fitur ini
+              sedang dikerjakan dan akan segera hadir.
+            </p>
+            <a
+              href="/features"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-light-border dark:border-dark-border hover:bg-light-hover dark:hover:bg-dark-hover transition-colors text-sm font-medium"
+            >
+              <span>Lihat Bocoran di Fitur</span>
+              <ArrowRight size={16} />
+            </a>
           </div>
         </div>
       </section>

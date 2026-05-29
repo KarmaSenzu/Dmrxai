@@ -16,8 +16,14 @@ import {
   Code2,
   Network,
   Sparkles,
+  Crown,
+  Bot,
+  Heart,
+  Shield,
+  Wand2,
   type LucideIcon,
 } from "lucide-react";
+import AppBuilderShowcase from "@/components/AppBuilderShowcase";
 
 type Feature = {
   icon: LucideIcon;
@@ -27,6 +33,15 @@ type Feature = {
 };
 
 const features: Feature[] = [
+  {
+    icon: Crown,
+    title: "Claude Opus 4.8 (Terbaru)",
+    description:
+      "Model Claude paling baru, baru saja rilis. Reasoning lebih tajam, jawaban lebih akurat, sudah tersedia di dmrxai.",
+    examples: [
+      "coba Opus 4.8: rancang arsitektur sistem microservice lengkap",
+    ],
+  },
   {
     icon: MessageSquare,
     title: "Chat AI Multi-Model",
@@ -106,6 +121,34 @@ const features: Feature[] = [
       "Response AI di-render dengan markdown lengkap: tabel, list, blockquote, dan code block dengan syntax highlight + tombol copy.",
     examples: ["tulis fungsi Python untuk validasi email dengan regex"],
   },
+  {
+    icon: Bot,
+    title: "Mode Agentic Multi-step",
+    description:
+      "AI bisa memakai tool secara otomatis dan berurutan — web search, fetch URL, sampai render chart. Modelnya sendiri yang memutuskan langkah mana yang perlu dijalankan.",
+    examples: ["cari tren AI 2026 lalu buatkan grafiknya"],
+  },
+  {
+    icon: FileSpreadsheet,
+    title: "Smart Sampling File Besar",
+    description:
+      "File Excel/CSV 5MB+ ditangani lewat schema kolom + statistik ringkas + sample baris, jadi AI tetap bisa menganalisis tanpa kehabisan konteks.",
+    examples: ["analisa file penjualan 100 ribu baris ini"],
+  },
+  {
+    icon: Heart,
+    title: "Dukungan Donasi Trakteer",
+    description:
+      "Bantu server tetap gratis lewat Trakteer. Ada progress bar, Top Sultan, dan countdown.",
+    examples: ["klik tombol Bantu untuk dukung dmrxai"],
+  },
+  {
+    icon: Shield,
+    title: "Privacy-first (Data Lokal)",
+    description:
+      "Riwayat chat tersimpan di browser kamu, bukan di server. Tanpa registrasi, tanpa tracking.",
+    examples: ["semua percakapan tetap privat di perangkatmu"],
+  },
 ];
 
 const tips: string[] = [
@@ -142,6 +185,13 @@ export default function FeaturesPage() {
             Asisten AI multi-fitur dengan akses internet, baca dokumen, analisis
             data, dan visualisasi.
           </p>
+          <p className="text-sm text-light-muted dark:text-dark-muted mt-3 max-w-2xl mx-auto leading-relaxed">
+            Kini dengan model terbaru{" "}
+            <span className="font-semibold text-light-accent dark:text-dark-accent">
+              Claude Opus 4.8
+            </span>{" "}
+            — reasoning lebih tajam, jawaban lebih akurat.
+          </p>
         </section>
 
         <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -171,6 +221,26 @@ export default function FeaturesPage() {
               </div>
             );
           })}
+        </section>
+
+        <section className="mt-12 rounded-2xl border border-light-border dark:border-dark-border bg-gradient-to-br from-light-sidebar to-light-input dark:from-dark-sidebar dark:to-dark-input p-6 sm:p-8 overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+            <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-gradient-to-r from-amber-400 to-orange-500 px-3 py-1 text-xs font-bold text-white shadow-sm">
+              <Wand2 size={13} />
+              Segera Hadir
+            </span>
+            <h2 className="text-2xl font-bold tracking-tight">
+              AI App Builder
+            </h2>
+          </div>
+
+          <p className="text-sm text-light-muted dark:text-dark-muted max-w-2xl leading-relaxed mb-6">
+            dmrxai sedang mengembangkan AI App Builder — cukup deskripsikan
+            aplikasi yang kamu mau, dmrxai menuliskan kodenya dan menampilkan
+            preview langsung di layar. Fitur ini lagi dikerjakan, segera hadir.
+          </p>
+
+          <AppBuilderShowcase />
         </section>
 
         <section className="bg-light-sidebar dark:bg-dark-sidebar border border-light-border dark:border-dark-border rounded-xl p-6 mt-12">
