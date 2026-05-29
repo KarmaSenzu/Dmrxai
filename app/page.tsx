@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTheme } from "@/hooks/useTheme";
 import { useSettings } from "@/hooks/useSettings";
 import { useChat } from "@/hooks/useChat";
@@ -9,6 +9,8 @@ import ChatWindow from "@/components/ChatWindow";
 import ChatInput from "@/components/ChatInput";
 import SettingsModal from "@/components/SettingsModal";
 import ModelCatalog from "@/components/ModelCatalog";
+import DonationModal from "@/components/DonationModal";
+import DonationAlert from "@/components/DonationAlert";
 import LoginPage from "@/components/LoginPage";
 
 export default function Home() {
@@ -32,8 +34,20 @@ export default function Home() {
 
   const [showSettings, setShowSettings] = useState(false);
   const [showModels, setShowModels] = useState(false);
+  const [showDonation, setShowDonation] = useState(false);
+  const [showAlert, setShowAlert] = useState(false);
   const [mode, setMode] = useState<AppMode>("chat");
   const [fetchedModels, setFetchedModels] = useState<string[]>([]);
+
+  // Auto-show the donation alert once per page load, after hydration is ready.
+  // Gated on mounted && isLoaded so it doesn't fire during the loading spinner.
+  const alertShownRef = useRef(false);
+  useEffect(() => {
+    if (mounted && isLoaded && !alertShownRef.current) {
+      alertShownRef.current = true;
+      setShowAlert(true);
+    }
+  }, [mounted, isLoaded]);
 
   // Load conversations on mount
   useEffect(() => {
@@ -111,11 +125,14 @@ export default function Home() {
   // Show Login Page if not configured (no API Key)
   if (!isConfigured) {
     return (
-      <LoginPage
-        onStart={completeOnboarding}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-      />
+      <>
+        <LoginPage
+          onStart={completeOnboarding}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
+        <DonationAlert isOpen={showAlert} onClose={() => setShowAlert(false)} />
+      </>
     );
   }
 
@@ -131,6 +148,7 @@ export default function Home() {
         onClearAll={clearAllConversations}
         onOpenSettings={() => setShowSettings(true)}
         onOpenModels={() => setShowModels(true)}
+        onOpenDonation={() => setShowDonation(true)}
         onLogout={() => resetSettings()}
         theme={theme}
         onToggleTheme={toggleTheme}
@@ -162,6 +180,7 @@ export default function Home() {
               currentModel={settings.model}
               onModelChange={(model) => updateSettings({ model })}
               fetchedModels={fetchedModels}
+              onOpenDonation={() => setShowDonation(true)}
             />
           </>
         ) : (
@@ -225,6 +244,15 @@ export default function Home() {
         }}
         fetchedModels={fetchedModels}
       />
+
+      {/* Donation Modal */}
+      <DonationModal
+        isOpen={showDonation}
+        onClose={() => setShowDonation(false)}
+      />
+
+      {/* Donation Alert (auto-shown on entry) */}
+      <DonationAlert isOpen={showAlert} onClose={() => setShowAlert(false)} />
     </div>
   );
 }

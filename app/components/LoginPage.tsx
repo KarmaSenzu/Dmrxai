@@ -17,8 +17,17 @@ import {
   MessageSquare,
   Heart,
   ExternalLink,
+  Clock,
+  Rocket,
   type LucideIcon,
 } from "lucide-react";
+import {
+  DONATION_DEADLINE_ISO,
+  TRAKTEER_URL,
+  LINKTEER_URL,
+  formatIDR,
+} from "@/lib/donation-config";
+import { useCountdown, useDonation } from "@/hooks/useDonation";
 
 interface LoginPageProps {
   onStart: () => void;
@@ -38,6 +47,7 @@ interface ComparisonRow {
 
 const COMPARISON_ROWS: ComparisonRow[] = [
   { feature: "Harga per bulan", dmrxai: "GRATIS", chatgpt: "$20", claude: "$20", gemini: "$20" },
+  { feature: "Claude Opus 4.8 (Terbaru)", dmrxai: "yes", chatgpt: "no", claude: "partial", gemini: "no" },
   { feature: "Claude Opus 4.7", dmrxai: "yes", chatgpt: "no", claude: "yes", gemini: "no" },
   { feature: "Claude Sonnet 4.6", dmrxai: "yes", chatgpt: "no", claude: "yes", gemini: "no" },
   { feature: "GPT-4o / GPT-5", dmrxai: "partial", chatgpt: "yes", claude: "no", gemini: "no" },
@@ -73,7 +83,7 @@ const FEATURES: FeatureItem[] = [
   {
     icon: Brain,
     title: "Multi Model AI",
-    desc: "Pilih dari 50+ model: Claude Opus 4.7, Sonnet 4.6, Haiku, GPT, Gemini, Llama, Qwen, DeepSeek, dan lainnya.",
+    desc: "Pilih dari 50+ model: Claude Opus 4.8 (terbaru), Opus 4.7, Sonnet 4.6, Haiku, GPT, Gemini, Llama, Qwen, DeepSeek, dan lainnya.",
   },
   {
     icon: Globe,
@@ -119,6 +129,12 @@ const FEATURES: FeatureItem[] = [
 
 export default function LoginPage({ onStart, theme, onToggleTheme }: LoginPageProps) {
   const [isStarting, setIsStarting] = useState(false);
+  const countdown = useCountdown(DONATION_DEADLINE_ISO);
+  const { data: donation } = useDonation({ enabled: true });
+
+  const goal = donation?.goal ?? 0;
+  const totalRaised = donation?.totalRaised ?? 0;
+  const donationPercent = goal > 0 ? Math.min(100, (totalRaised / goal) * 100) : 0;
 
   const handleStart = () => {
     if (isStarting) return;
@@ -164,9 +180,15 @@ export default function LoginPage({ onStart, theme, onToggleTheme }: LoginPagePr
       {/* Hero */}
       <section className="px-6 py-16 lg:py-24">
         <div className="max-w-5xl mx-auto text-center space-y-6">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs font-semibold">
-            <Zap size={12} />
-            <span>100% GRATIS</span>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs font-semibold">
+              <Zap size={12} />
+              <span>100% GRATIS</span>
+            </div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500/15 to-orange-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-semibold">
+              <Sparkles size={12} />
+              <span>Opus 4.8 Baru</span>
+            </div>
           </div>
           <h1 className="text-4xl lg:text-6xl font-bold tracking-tight leading-tight">
             AI Premium yang Sama Pintarnya
@@ -176,7 +198,7 @@ export default function LoginPage({ onStart, theme, onToggleTheme }: LoginPagePr
             </span>
           </h1>
           <p className="text-lg lg:text-xl text-light-muted dark:text-dark-muted max-w-3xl mx-auto leading-relaxed">
-            Akses Claude Opus 4.7, GPT, Gemini, dan model AI terbaik lainnya dengan fitur lengkap web search, analisis dokumen PDF/Excel, visualisasi chart, diagram ERD, vision, dan multi-step tool calling. Semua gratis.
+            Akses Claude Opus 4.8 (terbaru), GPT, Gemini, dan model AI terbaik lainnya dengan fitur lengkap web search, analisis dokumen PDF/Excel, visualisasi chart, diagram ERD, vision, dan multi-step tool calling. Semua gratis.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
             <button
@@ -305,6 +327,31 @@ export default function LoginPage({ onStart, theme, onToggleTheme }: LoginPagePr
         </div>
       </section>
 
+      {/* Coming soon: AI App Builder teaser */}
+      <section className="px-6 py-12">
+        <div className="max-w-3xl mx-auto">
+          <div className="rounded-2xl border border-violet-500/20 bg-gradient-to-br from-violet-500/5 to-blue-500/5 p-6 lg:p-8">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-violet-500/15 to-blue-500/15 border border-violet-500/30 text-violet-700 dark:text-violet-300 text-xs font-semibold">
+              <Rocket size={12} />
+              <span>Segera Hadir • Next Update</span>
+            </div>
+            <h3 className="text-2xl font-bold mt-4 mb-2">AI App Builder</h3>
+            <p className="text-sm text-light-muted dark:text-dark-muted leading-relaxed mb-5 max-w-2xl">
+              dmrxai sedang mengembangkan fitur AI App Builder. Cukup deskripsikan aplikasi yang kamu mau,
+              dmrxai akan menuliskan kodenya dan menampilkan preview-nya langsung dari ponsel. Fitur ini
+              sedang dikerjakan dan akan segera hadir.
+            </p>
+            <a
+              href="/features"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-light-border dark:border-dark-border hover:bg-light-hover dark:hover:bg-dark-hover transition-colors text-sm font-medium"
+            >
+              <span>Lihat Bocoran di Fitur</span>
+              <ArrowRight size={16} />
+            </a>
+          </div>
+        </div>
+      </section>
+
       {/* Support pitch */}
       <section className="px-6 py-12">
         <div className="max-w-3xl mx-auto">
@@ -320,11 +367,105 @@ export default function LoginPage({ onStart, theme, onToggleTheme }: LoginPagePr
                   <strong className="text-light-text dark:text-dark-text">100% gratis</strong> untuk uji coba. Tidak ada API key, tidak ada batas harian, akses penuh ke Claude Opus dan model premium lainnya.
                 </p>
                 <p className="text-sm text-light-muted dark:text-dark-muted leading-relaxed">
-                  Ke depan akan tersedia opsi{" "}
-                  <strong className="text-light-text dark:text-dark-text">subscription opsional Rp 15.000/bulan</strong>{" "}
-                  untuk membantu biaya server, listrik, dan operasional supaya website ini bisa tetap berjalan. Tidak wajib, donasi sukarela untuk mendukung developer.
+                  dmrxai sudah berjalan lebih dari 1 bulan tanpa meminta bantuan. Pada{" "}
+                  <strong className="text-light-text dark:text-dark-text">1 Juni 2026 pukul 07:00 WIB</strong>{" "}
+                  server kemungkinan ditutup kalau tidak ada dukungan. Bantu lewat Trakteer supaya dmrxai tetap gratis dan bisa terus diakses.
                 </p>
               </div>
+            </div>
+
+            {/* Countdown */}
+            <div className="mt-6">
+              <div className="flex items-center gap-1.5 mb-2">
+                <Clock size={14} className="text-pink-500" />
+                <span className="text-xs font-semibold text-light-text dark:text-dark-text">
+                  Sisa waktu menuju deadline
+                </span>
+              </div>
+              {countdown.expired ? (
+                <div className="rounded-xl bg-rose-500/10 border border-rose-500/30 px-4 py-3 text-center">
+                  <p className="text-sm font-semibold text-rose-600 dark:text-rose-400">
+                    Waktu habis
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { value: countdown.days, label: "Hari" },
+                    { value: countdown.hours, label: "Jam" },
+                    { value: countdown.minutes, label: "Menit" },
+                    { value: countdown.seconds, label: "Detik" },
+                  ].map((box) => (
+                    <div
+                      key={box.label}
+                      className="flex flex-col items-center justify-center rounded-xl bg-light-bg dark:bg-dark-bg border border-light-border dark:border-dark-border py-3"
+                    >
+                      <span className="text-2xl font-bold tabular-nums">
+                        {String(box.value).padStart(2, "0")}
+                      </span>
+                      <span className="text-[10px] uppercase tracking-wide text-light-muted dark:text-dark-muted mt-0.5">
+                        {box.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Progress */}
+            <div className="mt-5">
+              <div className="flex items-baseline justify-between mb-2">
+                <span className="text-xs font-semibold text-light-text dark:text-dark-text">
+                  Terkumpul
+                </span>
+                <span className="text-sm font-medium tabular-nums">
+                  {formatIDR(totalRaised)}{" "}
+                  <span className="text-light-muted dark:text-dark-muted font-normal">
+                    / {formatIDR(goal)}
+                  </span>
+                </span>
+              </div>
+              <div className="h-3 w-full rounded-full bg-light-bg dark:bg-dark-bg overflow-hidden border border-light-border dark:border-dark-border">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-500"
+                  style={{ width: `${donationPercent}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between mt-1.5">
+                <span className="text-[11px] text-light-muted dark:text-dark-muted tabular-nums">
+                  {donationPercent.toFixed(1)}%
+                </span>
+                {donation?.configured === false && (
+                  <span className="text-[11px] text-light-muted dark:text-dark-muted">
+                    Data donasi belum tersambung
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* CTA */}
+            <div className="mt-6 flex flex-col gap-2">
+              {/* Primary: langsung ke popup pembayaran */}
+              <a
+                href={donation?.linkteerUrl ?? LINKTEER_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold hover:opacity-90 transition-opacity shadow-lg shadow-emerald-500/25"
+              >
+                <Zap size={18} />
+                <span>Bantu Sekarang</span>
+              </a>
+              {/* Secondary: buka halaman Trakteer */}
+              <a
+                href={TRAKTEER_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-light-border dark:border-dark-border text-light-muted dark:text-dark-muted font-medium hover:bg-light-hover dark:hover:bg-dark-hover transition-colors"
+              >
+                <Heart size={16} />
+                <span>Dukung via Trakteer</span>
+                <ExternalLink size={14} />
+              </a>
             </div>
           </div>
         </div>
