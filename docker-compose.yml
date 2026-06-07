@@ -28,6 +28,8 @@ services:
       # Legacy: usage endpoint (opsional, kosongkan kalau tidak pakai)
       DMRXAI_API_URL: ${DMRXAI_API_URL:-}
       SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
+      # Donation feature (fitur-donate): forwards Trakteer API key into container
+      TRAKTEER_API_KEY: ${TRAKTEER_API_KEY:-}
     depends_on:
       - 9router
       - searxng

@@ -367,9 +367,9 @@ export default function LoginPage({ onStart, theme, onToggleTheme }: LoginPagePr
                   <strong className="text-light-text dark:text-dark-text">100% gratis</strong> untuk uji coba. Tidak ada API key, tidak ada batas harian, akses penuh ke Claude Opus dan model premium lainnya.
                 </p>
                 <p className="text-sm text-light-muted dark:text-dark-muted leading-relaxed">
-                  dmrxai sudah berjalan lebih dari 1 bulan tanpa meminta bantuan. Pada{" "}
+                  dmrxai sudah berjalan sejak 22 April 2026 tanpa meminta bantuan. Pada{" "}
                   <strong className="text-light-text dark:text-dark-text">1 Juni 2026 pukul 07:00 WIB</strong>{" "}
-                  server kemungkinan ditutup kalau tidak ada dukungan. Bantu lewat Trakteer supaya dmrxai tetap gratis dan bisa terus diakses.
+                  server kemungkinan ditutup kalau tidak ada dukungan. Bantu lewat Trakteer supaya dmrxai tetap gratis dan bisa terus diakses. Setiap bantuan dari kalian sangat berarti dan saya sangat berterima kasih atas supportnya, orang-orang baik 💖
                 </p>
               </div>
             </div>

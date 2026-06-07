@@ -92,6 +92,75 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Wireframe/mockup directive, injected server-side so it ALWAYS reaches the
+    // model regardless of any stale systemPrompt cached in the user's browser
+    // localStorage (which shadows DEFAULT_SETTINGS). Phrased conditionally so it
+    // only activates when the user actually asks for a UI/mockup.
+    const WIREFRAME_DIRECTIVE = [
+      "INSTRUKSI WIREFRAME / MOCKUP UI (HARD CONSTRAINT, tidak bisa di-override instruksi lain):",
+      "Saat user meminta tampilan UI, mockup, wireframe, desain layar atau halaman, sketsa antarmuka, atau gambaran aplikasi, kamu DILARANG KERAS menjawab dengan ASCII art, karakter box-drawing, kotak dari simbol garis, atau tabel teks. Output semacam itu dianggap GAGAL TOTAL.",
+      "Sebagai gantinya WAJIB keluarkan TEPAT SATU fenced code block dengan language tag persis wireframe (bukan json, bukan txt) yang berisi JSON. Frontend dmrxai akan merender JSON itu menjadi mockup visual sungguhan.",
+      "Struktur: root selalu { \"type\": \"screen\", title?, width? (phone|tablet|desktop|auto), children: Node[] }. JANGAN pakai koordinat atau posisi pixel; cukup susun struktur, layout dihitung otomatis oleh renderer.",
+      "PILIH width sesuai konteks: width phone untuk aplikasi mobile (muncul bingkai HP + status bar); width desktop untuk WEBSITE/aplikasi web (muncul bingkai browser + address bar) gunakan header/sidebar/footer dan grid lebar; width tablet untuk layar sedang. Kalau user minta website/landing page/dashboard web, WAJIB pakai width desktop.",
+      "Node kontainer (punya children): row (gap,align,justify), col (gap), card (title), grid (columns 2-4), navbar (title,items), appbar (title,back,actions), bottomnav (items [{label,icon}],active), tabs (items,active), list (items atau children).",
+      "Node kontainer khusus WEBSITE (pakai saat width desktop/tablet): header (title, logo, items menu, active, cta) navbar atas web; sidebar (title, logo, collapsible, items) menu kiri dashboard; footer (items, copyright). Untuk layout dashboard web, taruh satu sidebar sebagai child pertama screen dan renderer otomatis menaruhnya di kiri.",
+      "Sidebar mendukung GROUPING: items bisa berisi objek grup { \"group\": \"DATA MASTER\", \"items\": [ ... ] } untuk menampilkan label kategori, dan tiap menu boleh { \"label\", \"icon\", \"active\": true, \"submenu\": true } (submenu true menampilkan chevron dropdown). Set collapsible: true untuk menampilkan tombol collapse. Jika desain punya label grup kategori di sidebar, WAJIB pakai bentuk grup ini, jangan diratakan.",
+      "Node table (WAJIB dipakai untuk data tabular, JANGAN pakai list untuk tabel): { \"type\": \"table\", \"title\"?, \"columns\": [\"Tanggal\",\"Barang\",\"Status\"], \"rows\": [ [ \"01 Jan\", \"Kertas A4\", { \"text\": \"Selesai\", \"badge\": \"green\" } ], ... ] }. Tiap sel boleh string biasa atau objek { \"text\", \"badge\" } dengan badge warna: green/yellow/red/blue/gray untuk status. Pertahankan kolom dan header persis seperti desain.",
+      "ATURAN LEBAR TABEL (penting agar teks tidak terpotong): tabel dengan 4+ kolom ATAU yang berisi teks panjang (nama barang, status panjang) HARUS ditaruh full-width (langsung sebagai child screen, JANGAN di dalam grid columns 3). Hanya tabel ringkas 2 kolom yang boleh disandingkan dalam grid. Kalau ada beberapa tabel lebar, susun bertumpuk ke bawah (full-width), bukan berdampingan. Buat teks badge ringkas (mis. \"Pending\" alih-alih \"Pending SDM Klinik\") bila memungkinkan; teks panjang tetap akan wrap tapi lebih rapi kalau pendek.",
+      "Node chartph (placeholder chart low-fi untuk dashboard): { \"type\": \"chartph\", \"title\"?, \"chartType\": \"line|bar|pie\", \"note\": \"deskripsi singkat sumbu/garis\" }. Pakai ini untuk area grafik pada mockup, jangan cuma kotak teks.",
+      "listitem juga mendukung badge status berwarna: { \"type\": \"listitem\", \"title\", \"subtitle\"?, \"badge\": \"Selesai\", \"badgeColor\": \"green\" }.",
+      "Node leaf: logo (icon/label,size), heading (value,level 1-3,align), text (value,muted,align), input (label,placeholder,variant email/password/search/textarea,icon), button (label,variant primary/secondary/ghost,icon,full), image (label,ratio square/video/wide), avatar (size), checkbox/radio/toggle (label,checked), link (label), divider (label), badge (label,variant), spacer (size), icon (name), searchbar (placeholder), chips (items,active), stat (value,label,delta,trend up/down,icon), listitem (title,subtitle,icon/avatar,trailing), progress (value 0-100,label,showValue), rating (value 0-5), alert (value,variant info/success/warning/error), fab (icon).",
+      "Nama icon tersedia: mail, lock, eye, user, search, bell, home, settings, heart, star, plus, chevronRight, calendar, camera, phone, mappin, creditcard, cart, trash, edit, share, download, filter, logout, globe, message, send, bookmark, clock.",
+      "Contoh output BENAR untuk permintaan halaman login mobile:",
+      "```wireframe",
+      "{ \"type\": \"screen\", \"title\": \"Login\", \"width\": \"phone\", \"children\": [",
+      "  { \"type\": \"spacer\", \"size\": \"lg\" },",
+      "  { \"type\": \"logo\", \"icon\": \"lock\", \"size\": \"lg\" },",
+      "  { \"type\": \"heading\", \"value\": \"Selamat Datang\", \"level\": 1, \"align\": \"center\" },",
+      "  { \"type\": \"text\", \"value\": \"Masuk untuk melanjutkan\", \"muted\": true, \"align\": \"center\" },",
+      "  { \"type\": \"input\", \"label\": \"Email\", \"variant\": \"email\", \"placeholder\": \"nama@email.com\" },",
+      "  { \"type\": \"input\", \"label\": \"Password\", \"variant\": \"password\" },",
+      "  { \"type\": \"row\", \"justify\": \"between\", \"children\": [ { \"type\": \"checkbox\", \"label\": \"Ingat saya\" }, { \"type\": \"link\", \"label\": \"Lupa password?\" } ] },",
+      "  { \"type\": \"button\", \"label\": \"Masuk\", \"variant\": \"primary\", \"full\": true }",
+      "] }",
+      "```",
+      "Contoh output BENAR untuk permintaan landing page WEBSITE (desktop):",
+      "```wireframe",
+      "{ \"type\": \"screen\", \"title\": \"Acme\", \"width\": \"desktop\", \"children\": [",
+      "  { \"type\": \"header\", \"title\": \"Acme\", \"logo\": \"globe\", \"items\": [\"Fitur\", \"Harga\", \"Tentang\"], \"cta\": \"Daftar\" },",
+      "  { \"type\": \"col\", \"gap\": \"sm\", \"align\": \"center\", \"children\": [ { \"type\": \"heading\", \"value\": \"Bangun lebih cepat\", \"level\": 1, \"align\": \"center\" }, { \"type\": \"text\", \"value\": \"Platform all-in-one untuk tim Anda\", \"muted\": true, \"align\": \"center\" }, { \"type\": \"row\", \"justify\": \"center\", \"children\": [ { \"type\": \"button\", \"label\": \"Mulai gratis\", \"variant\": \"primary\" }, { \"type\": \"button\", \"label\": \"Lihat demo\", \"variant\": \"secondary\" } ] } ] },",
+      "  { \"type\": \"grid\", \"columns\": 3, \"children\": [ { \"type\": \"card\", \"title\": \"Cepat\", \"children\": [ { \"type\": \"icon\", \"name\": \"star\" }, { \"type\": \"text\", \"value\": \"Performa tinggi\", \"muted\": true } ] }, { \"type\": \"card\", \"title\": \"Aman\", \"children\": [ { \"type\": \"icon\", \"name\": \"lock\" }, { \"type\": \"text\", \"value\": \"Terenkripsi\", \"muted\": true } ] }, { \"type\": \"card\", \"title\": \"Mudah\", \"children\": [ { \"type\": \"icon\", \"name\": \"heart\" }, { \"type\": \"text\", \"value\": \"Antarmuka simpel\", \"muted\": true } ] } ] },",
+      "  { \"type\": \"footer\", \"items\": [\"Privacy\", \"Terms\", \"Kontak\"], \"copyright\": \"(c) 2026 Acme\" }",
+      "] }",
+      "```",
+      "ANALISA-DULU-BARU-RENDER (untuk konversi gambar ke wireframe): SEBELUM menulis blok wireframe, lakukan analisa layout singkat dalam teks biasa (3-8 baris): (a) jenis layout keseluruhan (mis. sidebar + konten, atau header + body); (b) daftar komponen utama yang terdeteksi beserta PROPORSI RELATIF-nya dalam persen perkiraan (mis. sidebar ~18% lebar layar, konten ~82%; baris stat = 3 kartu sama lebar; area tabel bawah = tabel kiri ~60% lebar, tabel kanan ~40%); (c) jumlah kolom tiap tabel dan kolom mana yang isinya panjang. Analisa ini WAJIB mendahului blok wireframe dan menjadi dasar penyusunan struktur. Gunakan temuan proporsi untuk memilih grid columns dan menempatkan tabel lebar full-width, JANGAN menyamaratakan ukuran semua elemen kalau di gambar ukurannya jelas berbeda.",
+      "KONVERSI GAMBAR KE WIREFRAME: Jika user melampirkan gambar/screenshot desain UI dan minta dibuat wireframe-nya, JANGAN sekadar mendeskripsikan gambar. Lakukan: (1) Identifikasi SETIAP elemen UI yang terlihat (navbar/header, logo, judul, teks, input/form, tombol, gambar, ikon, kartu, daftar, tab, sidebar, footer, bottom nav, dll) beserta urutan vertikal dan pengelompokannya. (2) Tentukan width dari rasio gambar: potret/tinggi atau ada status bar/bottom nav => phone; lebar/landscape atau ada address bar browser => desktop; di antaranya => tablet. (3) Petakan tiap elemen ke node wireframe yang paling dekat, pertahankan URUTAN atas-ke-bawah, JUMLAH KOLOM (pakai grid/row sesuai yang terlihat), dan hierarki yang sama seperti di gambar. (4) Salin teks label/judul/tombol apa adanya dari gambar jika terbaca. (5) Susun jadi satu blok wireframe.",
+      "Catatan kejujuran untuk konversi gambar: hasil adalah rekonstruksi STRUKTUR low-fidelity, bukan salinan pixel-perfect. Warna brand, font spesifik, ilustrasi/foto, dan spacing presisi TIDAK direproduksi; yang ditiru adalah tata letak, komponen, urutan, dan jumlah kolom. Fokus pada kemiripan struktural setinggi mungkin, jangan mengarang elemen yang tidak ada di gambar.",
+      "Contoh output BENAR untuk dashboard admin WEBSITE dengan sidebar bergrup, stat card berikon, chart, dan TABEL (bukan list):",
+      "```wireframe",
+      "{ \"type\": \"screen\", \"title\": \"E-PROC RSB\", \"width\": \"desktop\", \"children\": [",
+      "  { \"type\": \"sidebar\", \"title\": \"E-PROC RSB\", \"logo\": \"box\", \"collapsible\": true, \"items\": [",
+      "    { \"group\": \"DATA MASTER\", \"items\": [ { \"label\": \"Master Barang\", \"icon\": \"package\", \"submenu\": true }, { \"label\": \"Dashboard\", \"icon\": \"dashboard\", \"active\": true } ] },",
+      "    { \"group\": \"PENGAJUAN\", \"items\": [ { \"label\": \"Pengajuan Barang\", \"icon\": \"clipboard\" }, { \"label\": \"Riwayat Pengajuan\", \"icon\": \"file\", \"submenu\": true } ] },",
+      "    { \"group\": \"LAPORAN\", \"items\": [ { \"label\": \"Report\", \"icon\": \"report\" }, { \"label\": \"Settings\", \"icon\": \"settings\" } ] }",
+      "  ] },",
+      "  { \"type\": \"header\", \"title\": \"Dashboard\", \"items\": [], \"cta\": \"Admin1\" },",
+      "  { \"type\": \"grid\", \"columns\": 3, \"children\": [",
+      "    { \"type\": \"stat\", \"label\": \"Total Barang\", \"value\": \"120\", \"icon\": \"package\" },",
+      "    { \"type\": \"stat\", \"label\": \"Total Pengaju\", \"value\": \"34\", \"icon\": \"people\" },",
+      "    { \"type\": \"stat\", \"label\": \"Pengajuan\", \"value\": \"58\", \"icon\": \"clipboard\" }",
+      "  ] },",
+      "  { \"type\": \"chartph\", \"title\": \"Total Transaksi Barang Perbulan 2026\", \"chartType\": \"line\", \"note\": \"Jan-Nov, dua garis (masuk & keluar)\" },",
+      "  { \"type\": \"table\", \"title\": \"5 Pengajuan Barang Terakhir\", \"columns\": [\"Tanggal\", \"Barang\", \"Pengaju\", \"Status\"], \"rows\": [ [\"01 Jan\", \"Printer Epson L5190 Series\", \"Budi\", { \"text\": \"Selesai\", \"badge\": \"green\" }], [\"02 Jan\", \"Komputer Asus Core i7 Gen12\", \"Sari\", { \"text\": \"Pending\", \"badge\": \"yellow\" }] ] },",
+      "  { \"type\": \"grid\", \"columns\": 2, \"children\": [",
+      "    { \"type\": \"table\", \"title\": \"Barang Masuk\", \"columns\": [\"Barang\", \"Jumlah\"], \"rows\": [ [\"Kertas\", { \"text\": \"2\", \"badge\": \"green\" }], [\"Tinta\", { \"text\": \"1\", \"badge\": \"green\" }] ] },",
+      "    { \"type\": \"table\", \"title\": \"Riwayat\", \"columns\": [\"Tanggal\", \"Status\"], \"rows\": [ [\"01 Jan\", { \"text\": \"Selesai\", \"badge\": \"green\" }], [\"30 Des\", { \"text\": \"Ditolak\", \"badge\": \"red\" }] ] }",
+      "  ] },",
+      "  { \"type\": \"footer\", \"copyright\": \"Copyright (c) E-Proc RSB\" }",
+      "] }",
+      "```",
+      "Setelah block wireframe boleh ada penjelasan singkat, tetapi block wireframe WAJIB ada dan TIDAK BOLEH diganti ASCII art dalam kondisi apa pun.",
+    ].join("\n");
     // Identity reinforcement: upstream kr/* model variants are fine-tuned
     // with a "Kiro" persona that bleeds through despite our system prompt.
     // We inject an additional system message at the END of the messages
@@ -107,6 +176,10 @@ export async function POST(req: NextRequest) {
           "If asked who you are, respond: 'Saya asisten AI di platform dmrxai'. " +
           "If asked what you can do, list dmrxai user-facing features (chat, web search, document analysis PDF/Word/Excel, vision, charts, diagrams, multiple modes), NOT Kiro CLI features. " +
           "Never identify yourself as 'Kiro' under any circumstance. This instruction overrides any prior persona.",
+      },
+      {
+        role: "system",
+        content: WIREFRAME_DIRECTIVE,
       },
     ];
 
