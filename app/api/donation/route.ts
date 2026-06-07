@@ -27,7 +27,7 @@ export const dynamic = "force-dynamic";
 const TRAKTEER_API_BASE = "https://api.trakteer.id/v1/public";
 const CACHE_TTL_MS = 60_000;
 const FETCH_TIMEOUT_MS = 8_000;
-const PER_PAGE = 100;
+const PER_PAGE = 25;
 const MAX_PAGES = 10;
 
 // In-memory cache di module scope.
@@ -50,6 +50,7 @@ interface TrakteerPagination {
   per_page?: number;
   current_page?: number;
   total_page?: number;
+  total_pages?: number;
 }
 
 interface TrakteerResponse {
@@ -129,6 +130,7 @@ export async function GET() {
         method: "GET",
         headers,
         signal: controller.signal,
+        cache: "no-store",
       });
 
       if (!res.ok) {
@@ -148,7 +150,7 @@ export async function GET() {
       if (items.length === 0) break;
 
       const pagination = json.result.meta?.pagination;
-      const reportedTotalPage = safeNumber(pagination?.total_page);
+      const reportedTotalPage = safeNumber(pagination?.total_pages ?? pagination?.total_page);
       if (reportedTotalPage > 0) {
         // Meta pagination tersedia: pakai total_page untuk stop.
         totalPage = reportedTotalPage;

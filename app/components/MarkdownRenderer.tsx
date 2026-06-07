@@ -7,6 +7,7 @@ import { isValidElement, useState } from "react";
 import { Check, Copy } from "lucide-react";
 import ChartBlock from "./ChartBlock";
 import MermaidBlock from "./MermaidBlock";
+import WireframeBlock from "./WireframeBlock";
 
 interface MarkdownRendererProps {
   content: string;
@@ -18,6 +19,10 @@ function isChartClassName(className: unknown): boolean {
 
 function isMermaidClassName(className: unknown): boolean {
   return typeof className === "string" && /\blanguage-mermaid\b/.test(className);
+}
+
+function isWireframeClassName(className: unknown): boolean {
+  return typeof className === "string" && /\blanguage-wireframe\b/.test(className);
 }
 
 function extractText(node: React.ReactNode): string {
@@ -35,7 +40,7 @@ function PreBlock({ children, ...props }: React.HTMLAttributes<HTMLPreElement>) 
   // If the only child is a `code` element with the chart or mermaid language, skip the <pre> wrapper.
   if (isValidElement(children)) {
     const childProps = children.props as { className?: string };
-    if (isChartClassName(childProps?.className) || isMermaidClassName(childProps?.className)) {
+    if (isChartClassName(childProps?.className) || isMermaidClassName(childProps?.className) || isWireframeClassName(childProps?.className)) {
       return <>{children}</>;
     }
   }
@@ -65,6 +70,10 @@ function CodeBlock({ children, className, ...props }: React.HTMLAttributes<HTMLE
 
   if (isMermaidClassName(className)) {
     return <MermaidBlock code={extractText(children)} />;
+  }
+
+  if (isWireframeClassName(className)) {
+    return <WireframeBlock spec={extractText(children)} />;
   }
 
   const handleCopy = () => {

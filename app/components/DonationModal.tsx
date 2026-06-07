@@ -108,13 +108,13 @@ export default function DonationModal({ isOpen, onClose }: DonationModalProps) {
         <div className="flex-1 overflow-y-auto custom-scrollbar px-6 py-5 space-y-6">
           {/* Message */}
           <p className="text-sm text-light-muted dark:text-dark-muted leading-relaxed">
-            dmrxai sudah beroperasi lebih dari 1 bulan tanpa meminta bantuan
+            dmrxai sudah beroperasi sejak 22 April 2026 tanpa meminta bantuan
             sepeser pun. Pada{" "}
             <strong className="text-light-text dark:text-dark-text">
               1 Juni 2026 pukul 07:00 WIB
             </strong>
             , server kemungkinan akan ditutup. Kalau kamu ingin dmrxai tetap
-            gratis dan bisa terus diakses, bantu lewat Trakteer.
+            gratis dan bisa terus diakses, bantu lewat Trakteer. Setiap bantuan dari kalian sangat berarti dan saya sangat berterima kasih atas supportnya, orang-orang baik 💖
           </p>
 
           {/* Countdown */}
