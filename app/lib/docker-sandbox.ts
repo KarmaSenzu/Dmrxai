@@ -60,6 +60,8 @@ export interface DockerSandboxOptions {
   image?: string;
   /** Public base for preview URLs, e.g. "https://dmrxai.devplay.online". */
   previewBaseHost?: string;
+  /** Stable subdomain slug for this project (used in wildcard preview URLs). */
+  projectSlug?: string;
   /** Resource limits (e.g. "512m", "0.5", 128). */
   memLimit?: string;
   cpus?: string;
@@ -130,6 +132,7 @@ class DockerSandbox implements E2BSandbox {
   private container: DockerContainer;
   private workspace: string;
   private previewBaseHost: string;
+  private projectSlug: string | undefined;
   private stopped = false;
 
   constructor(container: DockerContainer, opts: DockerSandboxOptions) {
@@ -137,6 +140,7 @@ class DockerSandbox implements E2BSandbox {
     this.sandboxId = container.id;
     this.workspace = opts.workspaceContainerPath ?? DEFAULT_WORKSPACE;
     this.previewBaseHost = opts.previewBaseHost ?? "https://dmrxai.devplay.online";
+    this.projectSlug = opts.projectSlug;
 
     this.files = {
       write: (path, content) => this.writeFile(path, content),
@@ -227,10 +231,13 @@ class DockerSandbox implements E2BSandbox {
   }
 
   getHost(port: number): string {
-    // Preview URL pattern: https://<projectId>.dmrxai.devplay.online
-    // (the wildcard reverse proxy maps subdomain → this container's port).
-    const host = this.previewBaseHost.replace(/\/+$/, "");
-    return `${host}:${port}`;
+    // Wildcard subdomain pattern: https://<slug>.<base>
+    // The reverse proxy (Caddy/Traefik) maps *.dmrxai.devplay.online to this
+    // container's dev-server port. If no projectSlug is provided, fall back to
+    // the container id so the URL is always unique.
+    const base = this.previewBaseHost.replace(/^https?:\/\//, "").replace(/\/+$/, "");
+    const slug = this.projectSlug ?? this.sandboxId.slice(0, 12);
+    return `https://${slug}.${base}`;
   }
 
   async kill(): Promise<unknown> {
@@ -258,11 +265,12 @@ export class DockerAdapter implements E2BSdkAdapter {
 
   async create(
     _template: string,
-    _opts?: { timeoutMs?: number },
+    opts?: { timeoutMs?: number; projectSlug?: string },
   ): Promise<E2BSandbox> {
     const client = loadDockerClient();
     const image = this.opts.image ?? DEFAULT_IMAGE;
     const workspace = this.opts.workspaceContainerPath ?? DEFAULT_WORKSPACE;
+    const projectSlug = opts?.projectSlug;
 
     const container = await client.createContainer({
       Image: image,
@@ -287,7 +295,10 @@ export class DockerAdapter implements E2BSdkAdapter {
       workspaceHostDir: this.opts.workspaceHostDir,
     });
 
-    return new DockerSandbox(container, this.opts);
+    return new DockerSandbox(container, {
+      ...this.opts,
+      projectSlug,
+    });
   }
 
   async connect(sandboxId: string): Promise<E2BSandbox> {
