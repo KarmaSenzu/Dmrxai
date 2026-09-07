@@ -13,7 +13,7 @@
     "test:coverage": "vitest run --coverage",
     "prepare": "husky",
     "check-tdd": "node scripts/check-tdd.js",
-    "pre-commit": "node scripts/check-tdd.js && lint-staged",
+    "pre-commit": "node scripts/check-tdd.js",
     "tdd:watch": "node scripts/watch-tdd.js"
   },
   "dependencies": {
@@ -40,11 +40,6 @@
     "uuid": "^10.0.0",
     "xlsx": "^0.18.5"
   },
-  "lint-staged": {
-    "app/**/*.{ts,tsx}": [
-      "next lint --fix --file"
-    ]
-  },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -60,7 +55,6 @@
     "dotenv": "^17.4.2",
     "happy-dom": "^20.9.0",
     "husky": "9.1.7",
-    "lint-staged": "15.4.3",
     "postcss": "^8.4.44",
     "tailwindcss": "^3.4.10",
     "tsx": "^4.22.3",
