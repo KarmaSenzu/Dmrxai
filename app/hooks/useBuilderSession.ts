@@ -519,6 +519,14 @@ export function useBuilderSession(
               if (!isMountedRef.current) break;
 
               switch (eventName) {
+                case "terminal": {
+                  // Dedicated sandbox stdout/stderr event (emitted by the
+                  // server when running commands in the sandbox). Route
+                  // straight to the terminal log.
+                  const text = data.text as string;
+                  if (text) appendLog(text);
+                  break;
+                }
                 case "status": {
                   const p = data.phase as string;
                   const msg = data.message as string;

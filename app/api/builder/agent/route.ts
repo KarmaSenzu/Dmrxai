@@ -164,6 +164,14 @@ export async function POST(req: NextRequest) {
         }
       };
 
+      // Dedicated `terminal` event for sandbox stdout/stderr. Distinct from
+      // `status` (phase="terminal") so the client can route raw command output
+      // to the terminal panel without ambiguity. The client already handles
+      // both; this helper keeps the server side explicit.
+      const emitTerminal = (line: string) => {
+        emit("terminal", { text: line });
+      };
+
       try {
         log.debug("POST", "Starting agent turn", { projectId, promptLength: prompt.length, continuation });
 
@@ -293,6 +301,7 @@ export async function POST(req: NextRequest) {
             phase: "retrying",
             message: `AI provider error ${llmResponse.status}, mencoba lagi (${attempt + 1}/${MAX_RETRIES})...`,
           });
+          emitTerminal(`[retry] AI provider error ${llmResponse.status}, mencoba lagi (${attempt + 1}/${MAX_RETRIES})...`);
           await new Promise((r) => setTimeout(r, delay));
         }
 
