@@ -1474,72 +1474,88 @@ export default function BuilderWorkspaceE2B() {
                   maxHeight: "100%",
                 }}
               >
-                {/* StackBlitz mount surface — embedFiles() REPLACES this div
-                    with the live preview iframe. Keyed by projectId so React
-                    remounts a fresh div (and the embed effect re-runs) whenever
-                    the active project changes. Kept as the first, stable child
-                    so React never reconciles the StackBlitz-managed node. */}
-                <div
-                  key={session.projectId ?? "no-project"}
-                  ref={sbContainerRef}
-                  className="absolute inset-0 w-full h-full"
-                />
+                {/* Sandbox preview (server-driven): when the server emits a
+                    preview_ready URL (wildcard subdomain), render it in an
+                    iframe instead of the StackBlitz embed. This is the target
+                    architecture; StackBlitz remains as fallback below. */}
+                {session.previewUrl ? (
+                  <iframe
+                    key={session.previewUrl}
+                    src={session.previewUrl}
+                    title="App preview"
+                    className="absolute inset-0 w-full h-full border-0 bg-white"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+                  />
+                ) : (
+                  <>
+                    {/* StackBlitz mount surface — embedFiles() REPLACES this div
+                        with the live preview iframe. Keyed by projectId so React
+                        remounts a fresh div (and the embed effect re-runs) whenever
+                        the active project changes. Kept as the first, stable child
+                        so React never reconciles the StackBlitz-managed node. */}
+                    <div
+                      key={session.projectId ?? "no-project"}
+                      ref={sbContainerRef}
+                      className="absolute inset-0 w-full h-full"
+                    />
 
-                {/* Status overlays — always rendered AFTER the mount surface so
-                    the container keeps a stable position in the child list. */}
-                {sbStatus === "embedding" && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-light-bg dark:bg-dark-bg z-10">
-                    <div className="w-full max-w-md px-6 space-y-3">
-                      <div className="h-8 rounded-lg bg-gradient-to-r from-light-input via-light-hover to-light-input dark:from-dark-input dark:via-dark-hover dark:to-dark-input bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
-                      <div className="h-32 rounded-lg bg-gradient-to-r from-light-input via-light-hover to-light-input dark:from-dark-input dark:via-dark-hover dark:to-dark-input bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
-                      <div className="h-4 w-3/4 rounded-lg bg-gradient-to-r from-light-input via-light-hover to-light-input dark:from-dark-input dark:via-dark-hover dark:to-dark-input bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
-                      <div className="h-4 w-1/2 rounded-lg bg-gradient-to-r from-light-input via-light-hover to-light-input dark:from-dark-input dark:via-dark-hover dark:to-dark-input bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
-                    </div>
-                    <div className="mt-4 flex items-center gap-1.5 text-[11px] text-light-muted dark:text-dark-muted">
-                      <Loader2 size={11} className="animate-spin" />
-                      Memuat preview…
-                    </div>
-                    <style jsx>{`
-                      @keyframes shimmer {
-                        0% { background-position: 200% 0; }
-                        100% { background-position: -200% 0; }
-                      }
-                    `}</style>
-                  </div>
-                )}
+                    {/* Status overlays — always rendered AFTER the mount surface so
+                        the container keeps a stable position in the child list. */}
+                    {sbStatus === "embedding" && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-light-bg dark:bg-dark-bg z-10">
+                        <div className="w-full max-w-md px-6 space-y-3">
+                          <div className="h-8 rounded-lg bg-gradient-to-r from-light-input via-light-hover to-light-input dark:from-dark-input dark:via-dark-hover dark:to-dark-input bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
+                          <div className="h-32 rounded-lg bg-gradient-to-r from-light-input via-light-hover to-light-input dark:from-dark-input dark:via-dark-hover dark:to-dark-input bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
+                          <div className="h-4 w-3/4 rounded-lg bg-gradient-to-r from-light-input via-light-hover to-light-input dark:from-dark-input dark:via-dark-hover dark:to-dark-input bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
+                          <div className="h-4 w-1/2 rounded-lg bg-gradient-to-r from-light-input via-light-hover to-light-input dark:from-dark-input dark:via-dark-hover dark:to-dark-input bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
+                        </div>
+                        <div className="mt-4 flex items-center gap-1.5 text-[11px] text-light-muted dark:text-dark-muted">
+                          <Loader2 size={11} className="animate-spin" />
+                          Memuat preview…
+                        </div>
+                        <style jsx>{`
+                          @keyframes shimmer {
+                            0% { background-position: 200% 0; }
+                            100% { background-position: -200% 0; }
+                          }
+                        `}</style>
+                      </div>
+                    )}
 
-                {sbStatus === "error" && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-light-bg dark:bg-dark-bg text-light-muted dark:text-dark-muted px-6 z-10">
-                    <div className="w-16 h-16 rounded-2xl bg-rose-500/10 ring-1 ring-rose-500/30 flex items-center justify-center mb-3">
-                      <AlertCircle size={28} className="text-rose-500" strokeWidth={1.5} />
-                    </div>
-                    <p className="text-sm font-medium text-light-text dark:text-dark-text mb-1">
-                      Preview gagal dimuat
-                    </p>
-                    <p className="text-xs opacity-70 text-center max-w-[280px] mb-4">
-                      Terjadi kesalahan saat menyiapkan preview StackBlitz.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleRetryPreview}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 shadow-sm transition-all"
-                    >
-                      <RefreshCw size={12} />
-                      Coba lagi
-                    </button>
-                  </div>
-                )}
+                    {sbStatus === "error" && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-light-bg dark:bg-dark-bg text-light-muted dark:text-dark-muted px-6 z-10">
+                        <div className="w-16 h-16 rounded-2xl bg-rose-500/10 ring-1 ring-rose-500/30 flex items-center justify-center mb-3">
+                          <AlertCircle size={28} className="text-rose-500" strokeWidth={1.5} />
+                        </div>
+                        <p className="text-sm font-medium text-light-text dark:text-dark-text mb-1">
+                          Preview gagal dimuat
+                        </p>
+                        <p className="text-xs opacity-70 text-center max-w-[280px] mb-4">
+                          Terjadi kesalahan saat menyiapkan preview StackBlitz.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={handleRetryPreview}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 shadow-sm transition-all"
+                        >
+                          <RefreshCw size={12} />
+                          Coba lagi
+                        </button>
+                      </div>
+                    )}
 
-                {sbStatus === "idle" && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-light-bg dark:bg-dark-bg text-light-muted dark:text-dark-muted px-6 z-10">
-                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500/10 to-fuchsia-500/10 ring-1 ring-light-border/40 dark:ring-dark-border/40 flex items-center justify-center mb-3">
-                      <Eye size={28} className="text-light-muted dark:text-dark-muted" strokeWidth={1.5} />
-                    </div>
-                    <p className="text-sm font-medium text-light-text dark:text-dark-text mb-1">Preview belum tersedia</p>
-                    <p className="text-xs opacity-70 text-center max-w-[280px]">
-                      Mulai bangun app dari panel chat.
-                    </p>
-                  </div>
+                    {sbStatus === "idle" && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-light-bg dark:bg-dark-bg text-light-muted dark:text-dark-muted px-6 z-10">
+                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500/10 to-fuchsia-500/10 ring-1 ring-light-border/40 dark:ring-dark-border/40 flex items-center justify-center mb-3">
+                          <Eye size={28} className="text-light-muted dark:text-dark-muted" strokeWidth={1.5} />
+                        </div>
+                        <p className="text-sm font-medium text-light-text dark:text-dark-text mb-1">Preview belum tersedia</p>
+                        <p className="text-xs opacity-70 text-center max-w-[280px]">
+                          Mulai bangun app dari panel chat.
+                        </p>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
