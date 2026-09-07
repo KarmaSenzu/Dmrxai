@@ -56,6 +56,8 @@ export interface BuilderSessionState {
   terminalLogs: string[];
   error: string | null;
   isRunning: boolean;
+  /** Preview URL emitted by the server (wildcard subdomain) once the dev server is up. */
+  previewUrl: string | null;
 }
 
 export interface UseBuilderSessionResult extends BuilderSessionState {
@@ -112,6 +114,7 @@ export function useBuilderSession(
   const [error, setError] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [agentMode, setAgentMode] = useState<AgentMode | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
   const isMountedRef = useRef(true);
@@ -269,6 +272,7 @@ export function useBuilderSession(
       setIsRunning(true);
       setToolCalls([]);
       setAgentMode(null);
+      setPreviewUrl(null);
       hadErrorRef.current = false;
 
       // Add user message.
@@ -422,6 +426,11 @@ export function useBuilderSession(
                   (data.assistant_message as { content?: string } | undefined)
                     ?.content ||
                   "Done";
+                break;
+              }
+              case "preview_ready": {
+                const url = data.url as string;
+                if (url) setPreviewUrl(url);
                 break;
               }
               case "error": {
@@ -585,6 +594,7 @@ export function useBuilderSession(
     setError(null);
     setIsRunning(false);
     setAgentMode(null);
+    setPreviewUrl(null);
   }, []);
 
   const loadHistory = useCallback(
@@ -648,6 +658,7 @@ export function useBuilderSession(
     error,
     isRunning,
     agentMode,
+    previewUrl,
     send,
     abort,
     reset,
