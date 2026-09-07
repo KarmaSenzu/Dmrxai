@@ -62,6 +62,13 @@ export interface DockerSandboxOptions {
   previewBaseHost?: string;
   /** Stable subdomain slug for this project (used in wildcard preview URLs). */
   projectSlug?: string;
+  /**
+   * If set, each project gets its own subdirectory under this base:
+   * `<workspaceBaseDir>/<projectSlug>`. Used by the provider so concurrent
+   * projects don't share a workspace. Takes precedence over workspaceHostDir
+   * when a projectSlug is supplied at create() time.
+   */
+  workspaceBaseDir?: string;
   /** Resource limits (e.g. "512m", "0.5", 128). */
   memLimit?: string;
   cpus?: string;
@@ -272,12 +279,19 @@ export class DockerAdapter implements E2BSdkAdapter {
     const workspace = this.opts.workspaceContainerPath ?? DEFAULT_WORKSPACE;
     const projectSlug = opts?.projectSlug;
 
+    // Per-project workspace dir: <baseDir>/<projectSlug>. Falls back to the
+    // static workspaceHostDir when either is unavailable.
+    const workspaceHostDir =
+      this.opts.workspaceBaseDir && projectSlug
+        ? `${this.opts.workspaceBaseDir.replace(/\/+$/, "")}/${projectSlug}`
+        : this.opts.workspaceHostDir;
+
     const container = await client.createContainer({
       Image: image,
       Cmd: ["sleep", "infinity"], // keep alive; agent drives it via exec
       WorkingDir: workspace,
       HostConfig: {
-        Binds: [`${this.opts.workspaceHostDir}:${workspace}`],
+        Binds: [`${workspaceHostDir}:${workspace}`],
         Memory: this.opts.memLimit ? parseInt(this.opts.memLimit, 10) : 512 * 1024 * 1024,
         NanoCpus: this.opts.cpus ? Math.floor(parseFloat(this.opts.cpus) * 1e9) : 500_000_000,
         PidsLimit: this.opts.pidsLimit ?? 128,
@@ -292,11 +306,12 @@ export class DockerAdapter implements E2BSdkAdapter {
     log.info("create", "Sandbox container started", {
       containerId: container.id,
       image,
-      workspaceHostDir: this.opts.workspaceHostDir,
+      workspaceHostDir,
     });
 
     return new DockerSandbox(container, {
       ...this.opts,
+      workspaceHostDir,
       projectSlug,
     });
   }

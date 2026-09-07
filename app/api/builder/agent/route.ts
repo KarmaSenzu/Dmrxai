@@ -379,6 +379,15 @@ export async function POST(req: NextRequest) {
           emitTerminal(`\n⚠ Max ${MAX_ROUNDS} rounds reached`);
         }
 
+        // Emit preview URL once the sandbox has a dev server. The wildcard
+        // subdomain (https://<slug>.<base>) is provided by getHost(); the
+        // reverse proxy routes it to the sandbox's dev-server port.
+        if (sandbox) {
+          const previewUrl = sandbox.getHost(5173);
+          emit("preview_ready", { url: previewUrl });
+          log.debug("POST", "preview_ready", { previewUrl });
+        }
+
         emit("done", {
           summary: finalSummary || "Done",
           iterations: round,
