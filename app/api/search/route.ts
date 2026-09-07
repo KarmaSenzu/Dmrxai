@@ -1,4 +1,9 @@
 import { NextRequest } from "next/server";
+import { requireUser } from "@/lib/auth-server";
+import { createLogger } from "@/lib/logger";
+import { enforceRateLimit } from "@/lib/rate-limit";
+
+const log = createLogger("api/search");
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
@@ -23,6 +28,24 @@ interface NormalizedResult {
 
 export async function POST(req: NextRequest) {
   try {
+    log.info("POST", "Request received");
+
+    // Auth gate — web search is a protected route.
+    let user;
+    try {
+      user = await requireUser(req);
+    } catch (response) {
+      return response as Response;
+    }
+
+    // Rate limit: search calls a downstream SearxNG instance.
+    const limited = enforceRateLimit(
+      req,
+      { limit: 40, windowMs: 60_000, prefix: "search" },
+      user.id,
+    );
+    if (limited) return limited;
+
     const body = await req.json().catch(() => ({}));
     const query: unknown = body?.query;
     let count: number = typeof body?.count === "number" ? body.count : 8;
@@ -35,6 +58,8 @@ export async function POST(req: NextRequest) {
     }
 
     count = Math.max(1, Math.min(15, Math.floor(count)));
+
+    log.debug("POST", "Executing search query", { query, count });
 
     const searchUrl = `${SEARXNG_URL}/search?q=${encodeURIComponent(query)}&format=json&safesearch=0&language=auto`;
 
@@ -91,6 +116,7 @@ export async function POST(req: NextRequest) {
     );
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Search failed";
+    log.error("POST", "Search unavailable", { error: String(error) });
     return new Response(
       JSON.stringify({ error: `Search unavailable: ${message}`, results: [] }),
       { status: 503, headers: { "Content-Type": "application/json" } }

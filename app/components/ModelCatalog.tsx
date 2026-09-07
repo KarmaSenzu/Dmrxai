@@ -6,6 +6,7 @@ import {
   groupModels,
   formatModelDisplayName,
 } from "@/lib/model-categories";
+import { useEscapeKey } from "@/hooks/useEscapeKey";
 
 interface ModelCatalogProps {
   isOpen: boolean;
@@ -46,23 +47,31 @@ export default function ModelCatalog({
     [filteredIds]
   );
 
+  useEscapeKey(onClose, isOpen);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="model-catalog-title"
+    >
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative w-full max-w-2xl max-h-[85vh] bg-light-bg dark:bg-dark-bg border border-light-border dark:border-dark-border rounded-2xl shadow-2xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="px-6 py-5 border-b border-light-border dark:border-dark-border">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-bold text-light-text dark:text-dark-text">Available Models</h2>
+              <h2 id="model-catalog-title" className="text-lg font-bold text-light-text dark:text-dark-text">Available Models</h2>
               <p className="text-xs text-light-muted dark:text-dark-muted mt-1">
                 Models loaded from your connected provider, dikelompokkan per family.
               </p>
             </div>
             <button
               onClick={onClose}
+              aria-label="Close model catalog"
               className="p-2 rounded-lg hover:bg-light-hover dark:hover:bg-dark-hover text-light-muted dark:text-dark-muted transition-colors"
             >
               <X size={20} />

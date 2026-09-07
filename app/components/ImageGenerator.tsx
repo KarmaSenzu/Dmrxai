@@ -23,6 +23,7 @@ import {
   AlertCircle,
   Eraser,
 } from "lucide-react";
+import { useEscapeKey } from "@/hooks/useEscapeKey";
 
 interface ImageGeneratorProps {
   imageSettings: ImageSettings;
@@ -62,6 +63,9 @@ export default function ImageGenerator({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showNegativePrompt, setShowNegativePrompt] = useState(false);
   const [selectedImage, setSelectedImage] = useState<GeneratedImage | null>(null);
+
+  // Close preview on Escape
+  useEscapeKey(() => setSelectedImage(null), Boolean(selectedImage));
 
   // Combine hardcoded image models with any fetched models that look like image models
   const imageModelsList = [
@@ -445,17 +449,28 @@ export default function ImageGenerator({
 
       {/* Image Preview Modal */}
       {selectedImage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => setSelectedImage(null)}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80"
+          onClick={() => setSelectedImage(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Image preview"
+        >
           <div className="relative max-w-4xl max-h-[90vh] w-full" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => setSelectedImage(null)}
+              aria-label="Close image preview"
               className="absolute -top-10 right-0 p-2 text-white/70 hover:text-white transition-colors"
             >
               <X size={24} />
             </button>
             <img
               src={getImageSrc(selectedImage)}
-              alt={selectedImage.prompt}
+              alt={
+                selectedImage.prompt.length > 150
+                  ? selectedImage.prompt.slice(0, 150) + "..."
+                  : selectedImage.prompt
+              }
               className="w-full h-full object-contain rounded-xl"
             />
             <div className="mt-3 flex items-center justify-between">

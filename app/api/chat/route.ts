@@ -1,8 +1,33 @@
 import { NextRequest } from "next/server";
 import { resolveAIConfig } from "@/lib/server-config";
 import { TOOL_DEFINITIONS } from "@/lib/tools";
+import { requireUser } from "@/lib/auth-server";
+import { createLogger } from "@/lib/logger";
+import { validateUrl, UrlGuardError, getAllowedHostsFromEnv } from "@/lib/url-guard";
+import { readJsonWithLimit, DEFAULT_MAX_BODY } from "@/lib/body-limit";
+import { enforceRateLimit } from "@/lib/rate-limit";
+import { sanitizeUpstreamError } from "@/lib/sanitize-error";
+
+const log = createLogger("api/chat");
 
 export const runtime = "edge";
+
+type ChatContentPart =
+  | { type: "text"; text?: string }
+  | { type: "image_url"; image_url?: { url: string } }
+  | { type: string; text?: string; image_url?: { url: string } };
+
+type ChatMessage = {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | ChatContentPart[];
+  tool_calls?: Array<{
+    id: string;
+    type: string;
+    function: { name: string; arguments: string };
+  }>;
+  tool_call_id?: string;
+  name?: string;
+};
 
 // Rough token estimate for guardrail purposes only.
 // Tabular/CSV-heavy text is the densest case (~3.0 chars/token); we divide by 3.0
@@ -13,7 +38,7 @@ function estimateTokens(text: string): number {
   return Math.ceil(text.length / 3.0);
 }
 
-function estimateMessagesTokens(messages: any[]): number {
+function estimateMessagesTokens(messages: ChatMessage[]): number {
   let total = 0;
   for (const m of messages || []) {
     if (typeof m?.content === "string") {
@@ -37,7 +62,31 @@ function estimateMessagesTokens(messages: any[]): number {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    log.info("POST", "Request received");
+
+    // Auth gate — chat is a protected route.
+    let user;
+    try {
+      user = await requireUser(req);
+    } catch (response) {
+      return response as Response;
+    }
+
+    // Rate limit: heavy endpoint, allow a generous burst per user.
+    const limited = enforceRateLimit(
+      req,
+      { limit: 60, windowMs: 60_000, prefix: "chat" },
+      user.id,
+    );
+    if (limited) return limited;
+
+    let body: Record<string, unknown>;
+    try {
+      body = await readJsonWithLimit<Record<string, unknown>>(req, DEFAULT_MAX_BODY);
+    } catch (err) {
+      if (err instanceof Response) return err;
+      throw err;
+    }
     const {
       messages,
       apiKey: userApiKey,
@@ -48,14 +97,36 @@ export async function POST(req: NextRequest) {
       stream,
       chatMode,
       systemPrompt,
-    } = body ?? {};
+    } = (body ?? {}) as {
+      messages?: unknown;
+      apiKey?: string;
+      baseUrl?: string;
+      model?: string;
+      temperature?: number;
+      maxTokens?: number;
+      stream?: boolean;
+      chatMode?: string;
+      systemPrompt?: string;
+    };
 
     // Server-side override kalau env AI_API_KEY+AI_BASE_URL di-set,
     // kalau tidak fallback ke value yang user kirim (backward compat).
-    const { apiKey, baseUrl } = resolveAIConfig({
-      apiKey: userApiKey,
-      baseUrl: userBaseUrl,
-    });
+    let apiKey: string;
+    let baseUrl: string;
+    try {
+      const cfg = resolveAIConfig({
+        apiKey: userApiKey,
+        baseUrl: userBaseUrl,
+      });
+      apiKey = cfg.apiKey;
+      baseUrl = cfg.baseUrl;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Invalid AI config";
+      return new Response(
+        JSON.stringify({ error: message }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
 
     // Validate required fields. Surface a 400 with a clear message so the
     // browser can react without trying to parse SSE.
@@ -72,6 +143,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // SSRF guard: validate baseUrl points to a public AI provider host.
+    // Optional ALLOWED_AI_HOSTS env (comma-separated) tightens this further.
+    try {
+      validateUrl(baseUrl, {
+        allowedHosts: getAllowedHostsFromEnv("ALLOWED_AI_HOSTS"),
+      });
+    } catch (e) {
+      if (e instanceof UrlGuardError) {
+        return new Response(
+          JSON.stringify({ error: "Invalid baseUrl: " + e.code }),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      throw e;
+    }
+
     // Normalize base URL (strip trailing slashes) and build the OpenAI-style
     // chat completions endpoint.
     const normalizedBaseUrl = String(baseUrl).replace(/\/+$/, "");
@@ -80,7 +167,7 @@ export async function POST(req: NextRequest) {
     // Build the outgoing message list. If a systemPrompt is provided and the
     // first message isn't already a system message, prepend one. This keeps
     // mode-driven prompt augmentation in a single place (this route).
-    let outgoingMessages = messages as Array<{ role: string; content: unknown }>;
+    let outgoingMessages = messages as ChatMessage[];
     if (systemPrompt && typeof systemPrompt === "string" && systemPrompt.trim()) {
       const hasSystem =
         outgoingMessages.length > 0 && outgoingMessages[0]?.role === "system";
@@ -189,14 +276,14 @@ export async function POST(req: NextRequest) {
     const INLINED_PREFIXES = ["[File:", "[URL:", "[SEARCH:"];
     const containsInlined = (text: string) =>
       INLINED_PREFIXES.some((p) => text.includes(p));
-    const hasInlinedContent = outgoingMessages.some((m: any) => {
+    const hasInlinedContent = outgoingMessages.some((m) => {
       if (typeof m.content === "string") return containsInlined(m.content);
       if (Array.isArray(m.content)) {
         return m.content.some(
-          (p: any) =>
+          (p) =>
             p?.type === "text" &&
             typeof p?.text === "string" &&
-            containsInlined(p.text)
+            containsInlined(p.text),
         );
       }
       return false;
@@ -311,6 +398,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    log.debug("POST", "Calling AI provider", { endpoint, model: resolvedModel, chatMode, stream: requestBody.stream });
+
     let providerResponse: Response;
     let attempt = 0;
     while (true) {
@@ -375,7 +464,7 @@ export async function POST(req: NextRequest) {
               "Input terlalu panjang. File yang Anda lampirkan + riwayat percakapan melebihi kapasitas konteks model. " +
               "Coba: (1) hapus salah satu lampiran, (2) pecah Excel/PDF jadi bagian lebih kecil, atau (3) mulai chat baru.",
             code: "INPUT_TOO_LONG",
-            upstream: errorMessage,
+            upstream: sanitizeUpstreamError(errorMessage),
           }),
           { status: 400, headers: { "Content-Type": "application/json" } }
         );
@@ -383,7 +472,7 @@ export async function POST(req: NextRequest) {
 
       return new Response(
         JSON.stringify({
-          error: `Provider error (${providerResponse.status}): ${errorMessage}`,
+          error: `Provider error (${providerResponse.status}): ${sanitizeUpstreamError(errorMessage)}`,
         }),
         {
           status: providerResponse.status,
@@ -418,9 +507,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Internal server error";
-    console.error("Chat API error:", error);
+    log.error("POST", "Chat API error", { error: String(error) });
     return new Response(
-      JSON.stringify({ error: message }),
+      JSON.stringify({ error: sanitizeUpstreamError(message) || "Internal server error" }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }

@@ -1,4 +1,10 @@
 import { NextRequest } from "next/server";
+import { requireUser } from "@/lib/auth-server";
+import { createLogger } from "@/lib/logger";
+import { readJsonWithLimit, DEFAULT_MAX_BODY } from "@/lib/body-limit";
+import { enforceRateLimit } from "@/lib/rate-limit";
+
+const log = createLogger("api/usage");
 
 export const runtime = "edge";
 
@@ -10,12 +16,31 @@ function getUsageServerUrl(): string {
 
 export async function POST(req: NextRequest) {
   try {
+    log.info("POST", "Request received");
+
+    // Auth gate — usage data is per-user and not public.
+    let user;
+    try {
+      user = await requireUser(req);
+    } catch (response) {
+      return response as Response;
+    }
+
+    // Rate limit: dashboard polling can be chatty, but a per-user cap is fine.
+    const limited = enforceRateLimit(
+      req,
+      { limit: 60, windowMs: 60_000, prefix: "usage" },
+      user.id,
+    );
+    if (limited) return limited;
+
     const AI_SERVER_URL = getUsageServerUrl();
 
     // If usage tracking endpoint isn't configured (e.g. when AI is "managed
     // by server" via 9router but no separate usage server is wired up),
     // return 503 with a polite message instead of trying localhost:1430.
     if (!AI_SERVER_URL) {
+      log.warn("POST", "Usage tracking not configured, DMRXAI_API_URL is empty");
       return new Response(
         JSON.stringify({
           error: "Usage tracking not configured",
@@ -25,15 +50,31 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
+    let body: { apiKey?: unknown };
+    try {
+      body = await readJsonWithLimit<{ apiKey?: unknown }>(req, DEFAULT_MAX_BODY);
+    } catch (err) {
+      if (err instanceof Response) return err;
+      throw err;
+    }
     const { apiKey } = body;
 
-    if (!apiKey) {
+    // Validate API key format before forwarding to internal server.
+    // Reject anything that doesn't look like a credential token (length and
+    // character set) — keeps malformed input from reaching the upstream.
+    if (
+      typeof apiKey !== "string" ||
+      apiKey.length < 10 ||
+      apiKey.length > 500 ||
+      !/^[a-zA-Z0-9_\-.]+$/.test(apiKey)
+    ) {
       return new Response(
-        JSON.stringify({ error: "API Key diperlukan." }),
+        JSON.stringify({ error: "Invalid API key format" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
+
+    log.debug("POST", "Fetching usage data from endpoints", { serverUrl: AI_SERVER_URL });
 
     // Try to fetch usage/dashboard data from configured server
     // Common endpoints: /usage, /dashboard, /me, /billing/usage
@@ -102,6 +143,7 @@ export async function POST(req: NextRequest) {
     );
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Terjadi kesalahan.";
+    log.error("POST", "Usage API error", { error: String(error) });
     return new Response(
       JSON.stringify({ error: message }),
       { status: 500, headers: { "Content-Type": "application/json" } }

@@ -61,6 +61,19 @@ interface ChartSpec {
   valueKey?: string;
 }
 
+/**
+ * Lightweight schema check for the parsed chart payload. We don't validate
+ * every field — the renderer below already guards individual sections
+ * (supportedTypes, data array, series shape) — but we make sure the top-level
+ * blob looks like a chart spec at all so a stray JSON like `123` or `null`
+ * can't reach the rest of the rendering pipeline.
+ */
+function isValidChartSpec(v: unknown): boolean {
+  if (!v || typeof v !== "object") return false;
+  const o = v as Record<string, unknown>;
+  return typeof o.type === "string" && Array.isArray(o.data);
+}
+
 function Fallback({
   message,
   spec,
@@ -119,7 +132,11 @@ export default function ChartBlock({ spec }: { spec: string }) {
 
   let parsed: ChartSpec;
   try {
-    parsed = JSON.parse(spec);
+    const raw: unknown = JSON.parse(spec);
+    if (!isValidChartSpec(raw)) {
+      return <Fallback message="Invalid chart spec shape" spec={spec} />;
+    }
+    parsed = raw as ChartSpec;
   } catch {
     return <Fallback message="Invalid chart JSON" spec={spec} />;
   }

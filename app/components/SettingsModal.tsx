@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Settings } from "@/lib/types";
 import { X, RotateCcw, CheckCircle2 } from "lucide-react";
+import { useEscapeKey } from "@/hooks/useEscapeKey";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -19,6 +20,8 @@ export default function SettingsModal({ isOpen, onClose, settings, onSave, onRes
     setLocalSettings(settings);
   }, [settings, isOpen]);
 
+  useEscapeKey(onClose, isOpen);
+
   if (!isOpen) return null;
 
   const handleSave = () => {
@@ -32,14 +35,20 @@ export default function SettingsModal({ isOpen, onClose, settings, onSave, onRes
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settings-modal-title"
+    >
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative w-full max-w-lg bg-light-bg dark:bg-dark-bg border border-light-border dark:border-dark-border rounded-2xl shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-light-border dark:border-dark-border">
-          <h2 className="text-xl font-bold text-light-text dark:text-dark-text">Settings</h2>
+          <h2 id="settings-modal-title" className="text-xl font-bold text-light-text dark:text-dark-text">Settings</h2>
           <button
             onClick={onClose}
+            aria-label="Close settings"
             className="p-1 rounded-lg hover:bg-light-hover dark:hover:bg-dark-hover text-light-muted dark:text-dark-muted transition-colors"
           >
             <X size={20} />

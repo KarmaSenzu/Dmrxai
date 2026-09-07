@@ -19,13 +19,9 @@ const MODE_STORAGE_KEY = "chat-app-mode";
 // Tuned so a single attachment + 280-line system prompt + history + thinking budget
 // stays well under Claude Opus 4.7's 200K context window.
 const MAX_ATTACHMENT_CHARS = 80_000;
-// Per-sheet sub-cap is now derived from MAX_ATTACHMENT_CHARS, but we keep a hard
-// floor so a single huge sheet can't crowd the others out completely.
-// NOTE: Obsolete for the new schema-based extractXlsxText (which uses sample
-// sizes + reduction passes instead of proportional char budgets). Kept declared
-// in case other code references it — safe to remove later.
-const MIN_PER_SHEET_CHARS = 4_000;
-void MIN_PER_SHEET_CHARS;
+// NOTE: Per-sheet sub-cap was previously hard-coded; the new schema-based
+// extractXlsxText now uses sample sizes + reduction passes instead, so the
+// constant is no longer needed.
 
 // ─── XLSX extraction helpers (module-scope, pure) ─────────────────
 
@@ -172,6 +168,12 @@ interface ChatInputProps {
   onModelChange: (model: string) => void;
   fetchedModels?: string[];
   onOpenDonation?: () => void;
+  /**
+   * Optional callback fired on every keystroke with the current textarea value.
+   * Used by the parent (e.g. for build-intent nudge detection). Does not change
+   * existing behavior — purely additive.
+   */
+  onTextChange?: (text: string) => void;
 }
 
 export default function ChatInput({
@@ -183,6 +185,7 @@ export default function ChatInput({
   onModelChange,
   fetchedModels = [],
   onOpenDonation,
+  onTextChange,
 }: ChatInputProps) {
   const [input, setInput] = useState("");
   const [showModelPicker, setShowModelPicker] = useState(false);
@@ -256,6 +259,7 @@ export default function ChatInput({
     if ((!input.trim() && attachments.length === 0) || isLoading || disabled) return;
     onSend(input, chatMode, attachments.length > 0 ? attachments : undefined);
     setInput("");
+    onTextChange?.("");
     setAttachments([]);
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -1107,7 +1111,11 @@ export default function ChatInput({
             <textarea
               ref={textareaRef}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setInput(v);
+                onTextChange?.(v);
+              }}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               placeholder={

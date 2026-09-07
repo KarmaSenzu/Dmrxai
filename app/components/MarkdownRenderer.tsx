@@ -1,6 +1,6 @@
 "use client";
 
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { isValidElement, useState } from "react";
@@ -76,11 +76,15 @@ function CodeBlock({ children, className, ...props }: React.HTMLAttributes<HTMLE
     return <WireframeBlock spec={extractText(children)} />;
   }
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     const text = String(children).replace(/\n$/, "");
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.warn("Clipboard write failed:", err);
+    }
   };
 
   return (
@@ -114,15 +118,20 @@ function CodeBlock({ children, className, ...props }: React.HTMLAttributes<HTMLE
 }
 
 export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
+  // react-markdown's `Components` map uses complex generic types for each
+  // HTML element. Cast our locally-typed handlers through `Components` so
+  // we don't need `any` at the call site.
+  const components: Components = {
+    code: CodeBlock as Components["code"],
+    pre: PreBlock as Components["pre"],
+  };
+
   return (
     <div className="message-content">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeHighlight]}
-        components={{
-          code: CodeBlock as any,
-          pre: PreBlock as any,
-        }}
+        components={components}
       >
         {content}
       </ReactMarkdown>
