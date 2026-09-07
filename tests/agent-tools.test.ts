@@ -121,4 +121,29 @@ describe("parseToolCall", () => {
     const parsed = parseToolCall(call);
     expect(parsed?.name).toBe("list_files");
   });
+
+  it("parses run_command with command", () => {
+    const call = {
+      id: "tc-1",
+      type: "function" as const,
+      function: {
+        name: "run_command",
+        arguments: JSON.stringify({ command: "npm install" }),
+      },
+    };
+    const parsed = parseToolCall(call);
+    expect(parsed?.name).toBe("run_command");
+    if (parsed?.name === "run_command") {
+      expect(parsed.args.command).toBe("npm install");
+    }
+  });
+
+  it("returns null for run_command without command", () => {
+    const call = {
+      id: "tc-1",
+      type: "function" as const,
+      function: { name: "run_command", arguments: "{}" },
+    };
+    expect(parseToolCall(call)).toBeNull();
+  });
 });

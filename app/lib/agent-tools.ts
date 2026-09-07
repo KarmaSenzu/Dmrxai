@@ -123,8 +123,25 @@ export const BUILDER_TOOLS: ToolDefinition[] = [
   {
     type: "function",
     function: {
+      name: "run_command",
+      description: "Run a shell command inside the project sandbox (e.g. 'npm install', 'npm run dev', 'ls -la'). Output (stdout/stderr) is streamed back. Use to install dependencies declared in package.json or inspect the environment.",
+      parameters: {
+        type: "object",
+        properties: {
+          command: {
+            type: "string",
+            description: "The shell command to run inside the sandbox workspace directory",
+          },
+        },
+        required: ["command"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "done",
-      description: "Signal that you have completed the current task. Call this when all files are written and dependencies are declared in package.json so StackBlitz can install them and start the dev server. Include a summary of what was built/changed.",
+      description: "Signal that you have completed the current task. Call this when all files are written and dependencies are declared in package.json so the sandbox can install them and start the dev server. Include a summary of what was built/changed.",
       parameters: {
         type: "object",
         properties: {
@@ -556,6 +573,7 @@ export interface ApplyDiffArgs { path: string; diff: string; }
 export interface DeleteFileArgs { path: string; }
 export interface ReadFileArgs { path: string; }
 export interface ListFilesArgs { directory?: string; }
+export interface RunCommandArgs { command: string; }
 export interface DoneArgs { summary: string; }
 
 export type ToolArgs =
@@ -564,6 +582,7 @@ export type ToolArgs =
   | { name: "delete_file"; args: DeleteFileArgs }
   | { name: "read_file"; args: ReadFileArgs }
   | { name: "list_files"; args: ListFilesArgs }
+  | { name: "run_command"; args: RunCommandArgs }
   | { name: "done"; args: DoneArgs };
 
 /**
@@ -591,6 +610,9 @@ export function parseToolCall(call: ToolCall): ToolArgs | null {
         return { name, args: { path: args.path } };
       case "list_files":
         return { name, args: { directory: typeof args.directory === "string" ? args.directory : undefined } };
+      case "run_command":
+        if (typeof args.command !== "string") return null;
+        return { name, args: { command: args.command } };
       case "done":
         return { name, args: { summary: typeof args.summary === "string" ? args.summary : "Done" } };
       default:
