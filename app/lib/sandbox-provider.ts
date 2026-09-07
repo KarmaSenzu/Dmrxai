@@ -20,7 +20,7 @@
 import "server-only";
 
 import { createLogger } from "@/lib/logger";
-import { getSandboxManager, _setSdkForTest, type E2BSdkAdapter } from "@/lib/e2b-sandbox";
+import { getSandboxManager, setSdkAdapter, type E2BSdkAdapter } from "@/lib/e2b-sandbox";
 import { DockerAdapter } from "@/lib/docker-sandbox";
 
 const log = createLogger("sandbox-provider");
@@ -77,7 +77,7 @@ export function initSandboxProvider(): void {
   const provider = resolveProvider();
   const adapter = buildAdapter(provider);
   if (adapter) {
-    _setSdkForTest(adapter);
+    setSdkAdapter(adapter);
   }
   initialized = true;
   log.info("initSandboxProvider", "Sandbox provider initialised", { provider });
@@ -86,7 +86,7 @@ export function initSandboxProvider(): void {
 /** Test-only: reset provider state + injected SDK. */
 export function _resetSandboxProviderForTest(): void {
   initialized = false;
-  _setSdkForTest(null);
+  setSdkAdapter(null);
 }
 
 /**

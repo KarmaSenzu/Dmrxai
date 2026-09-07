@@ -76,10 +76,12 @@ let sdkInitTried = false;
 let loadedSdk: E2BSdkAdapter | null = null;
 
 /**
- * Override the SDK adapter. Used exclusively by tests to inject a fake E2B
- * client; production code never calls this.
+ * Inject an SDK adapter into the manager. Used both in production (by
+ * `sandbox-provider` to wire in the Docker adapter) and in tests (to inject a
+ * fake). Passing null clears any injected adapter so `loadSdk()` falls back to
+ * lazily loading the real E2B SDK.
  */
-export function _setSdkForTest(sdk: E2BSdkAdapter | null): void {
+export function setSdkAdapter(sdk: E2BSdkAdapter | null): void {
   injectedSdk = sdk;
   sdkInitTried = false;
   loadedSdk = null;
@@ -373,7 +375,7 @@ export function getSandboxManager(): SandboxManager {
 /** Test-only: reset the singleton + any injected SDK. */
 export function _resetSandboxManagerForTest(): void {
   defaultManager = null;
-  _setSdkForTest(null);
+  setSdkAdapter(null);
 }
 
 export default SandboxManager;
