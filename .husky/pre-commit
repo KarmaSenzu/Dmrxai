@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+
+# Check TDD compliance: every source file must have a test
+node scripts/check-tdd.js --staged

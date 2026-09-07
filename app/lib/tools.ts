@@ -104,7 +104,7 @@ export async function executeTool(
   argsJson: string,
   ctx: ToolExecutionContext = {}
 ): Promise<string> {
-  let args: any;
+  let args: unknown;
   try {
     args = argsJson ? JSON.parse(argsJson) : {};
   } catch {
@@ -124,29 +124,37 @@ export async function executeTool(
 }
 
 async function executeWebSearch(
-  args: { query?: string; count?: number },
+  args: unknown,
   ctx: ToolExecutionContext
 ): Promise<string> {
-  if (!args.query || typeof args.query !== "string") {
+  if (!args || typeof args !== "object") {
+    return JSON.stringify({ error: "Invalid args" });
+  }
+  const obj = args as Record<string, unknown>;
+  if (typeof obj.query !== "string" || obj.query.length === 0) {
     return JSON.stringify({ error: "Missing required 'query' parameter" });
   }
   const resp = await fetch("/api/search", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      query: args.query,
-      count: typeof args.count === "number" ? args.count : 8,
+      query: obj.query,
+      count: typeof obj.count === "number" ? obj.count : 8,
     }),
     signal: ctx.signal,
   });
   if (!resp.ok) {
-    const errBody = await resp.json().catch(() => ({}));
+    const errBody = (await resp.json().catch(() => ({}))) as { error?: string };
     return JSON.stringify({
       error: `Search failed (HTTP ${resp.status}): ${errBody?.error || "unknown"}`,
       results: [],
     });
   }
-  const data = await resp.json();
+  const data = (await resp.json()) as {
+    query?: string;
+    count?: number;
+    results?: unknown;
+  };
   // Return a compact JSON string the model can read.
   return JSON.stringify({
     query: data.query,
@@ -156,25 +164,34 @@ async function executeWebSearch(
 }
 
 async function executeFetchUrl(
-  args: { url?: string },
+  args: unknown,
   ctx: ToolExecutionContext
 ): Promise<string> {
-  if (!args.url || typeof args.url !== "string") {
+  if (!args || typeof args !== "object") {
+    return JSON.stringify({ error: "Invalid args" });
+  }
+  const obj = args as Record<string, unknown>;
+  if (typeof obj.url !== "string" || obj.url.length === 0) {
     return JSON.stringify({ error: "Missing required 'url' parameter" });
   }
   const resp = await fetch("/api/fetch-url", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url: args.url }),
+    body: JSON.stringify({ url: obj.url }),
     signal: ctx.signal,
   });
   if (!resp.ok) {
-    const errBody = await resp.json().catch(() => ({}));
+    const errBody = (await resp.json().catch(() => ({}))) as { error?: string };
     return JSON.stringify({
       error: `Fetch failed (HTTP ${resp.status}): ${errBody?.error || "unknown"}`,
     });
   }
-  const data = await resp.json();
+  const data = (await resp.json()) as {
+    url?: string;
+    title?: string;
+    text?: string;
+    truncated?: boolean;
+  };
   return JSON.stringify({
     url: data.url,
     title: data.title,
@@ -183,15 +200,19 @@ async function executeFetchUrl(
   });
 }
 
-function executeRenderChart(args: any): string {
+function executeRenderChart(args: unknown): string {
   // Validate chart spec minimally.
   if (!args || typeof args !== "object") {
     return JSON.stringify({ error: "Invalid chart spec" });
   }
-  if (!["line", "bar", "area", "pie"].includes(args.type)) {
-    return JSON.stringify({ error: `Unsupported chart type: ${args.type}` });
+  const obj = args as Record<string, unknown>;
+  if (
+    typeof obj.type !== "string" ||
+    !["line", "bar", "area", "pie"].includes(obj.type)
+  ) {
+    return JSON.stringify({ error: `Unsupported chart type: ${String(obj.type)}` });
   }
-  if (!Array.isArray(args.data) || args.data.length === 0) {
+  if (!Array.isArray(obj.data) || obj.data.length === 0) {
     return JSON.stringify({ error: "Chart data is empty" });
   }
   // Echo the spec back. The renderer side will see this in the tool result
@@ -201,10 +222,10 @@ function executeRenderChart(args: any): string {
   // chart block lives.
   return JSON.stringify({
     ok: true,
-    spec: args,
+    spec: obj,
     instruction:
       "Render the chart by including this exact fenced code block in your next response, then briefly explain it:\n```chart\n" +
-      JSON.stringify(args) +
+      JSON.stringify(obj) +
       "\n```",
   });
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
   Check,
@@ -136,10 +136,28 @@ export default function LoginPage({ onStart, theme, onToggleTheme }: LoginPagePr
   const totalRaised = donation?.totalRaised ?? 0;
   const donationPercent = goal > 0 ? Math.min(100, (totalRaised / goal) * 100) : 0;
 
+  // Track the deferred onStart timer so we can cancel it on unmount.
+  // Without this, navigating away mid-fade would invoke onStart on a
+  // stale router/component, occasionally surfacing as a "Can't perform a
+  // React state update on an unmounted component" warning.
+  const startTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (startTimerRef.current) {
+        clearTimeout(startTimerRef.current);
+        startTimerRef.current = null;
+      }
+    };
+  }, []);
+
   const handleStart = () => {
     if (isStarting) return;
     setIsStarting(true);
-    setTimeout(onStart, 200);
+    startTimerRef.current = setTimeout(() => {
+      startTimerRef.current = null;
+      onStart();
+    }, 200);
   };
 
   return (

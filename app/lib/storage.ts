@@ -3,7 +3,6 @@ import { Settings, Conversation, DEFAULT_SETTINGS } from "./types";
 const SETTINGS_KEY = "chat-app-settings";
 const CONVERSATIONS_KEY = "chat-app-conversations";
 const THEME_KEY = "chat-app-theme";
-const ONBOARDED_KEY = "dmrxai-onboarded";
 
 // Settings
 export function getSettings(): Settings {
@@ -29,26 +28,67 @@ export function saveSettings(settings: Settings): void {
 }
 
 // Conversations
+//
+// Defensive schema validation: localStorage can be edited by hand,
+// migrated from older schemas, or corrupted by other code. Filter out
+// anything that doesn't match the minimal `Conversation` shape so the
+// rest of the app can rely on the returned values.
+function isConversation(item: unknown): item is Conversation {
+  if (!item || typeof item !== "object") return false;
+  const c = item as Record<string, unknown>;
+  return typeof c.id === "string" && Array.isArray(c.messages);
+}
+
 export function getConversations(): Conversation[] {
   if (typeof window === "undefined") return [];
   try {
     const stored = localStorage.getItem(CONVERSATIONS_KEY);
-    if (stored) {
-      return JSON.parse(stored);
-    }
+    if (!stored) return [];
+    const parsed = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isConversation);
   } catch (e) {
     console.error("Failed to load conversations:", e);
+    return [];
   }
-  return [];
 }
 
 export function saveConversations(conversations: Conversation[]): void {
   if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(CONVERSATIONS_KEY, JSON.stringify(conversations));
-  } catch (e) {
-    console.error("Failed to save conversations:", e);
+
+  // Best-effort: when localStorage is full, drop the oldest conversations
+  // (lowest updatedAt) and retry up to a few times before giving up.
+  let toSave = [...conversations].sort(
+    (a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0),
+  );
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      localStorage.setItem(CONVERSATIONS_KEY, JSON.stringify(toSave));
+      return;
+    } catch (e) {
+      const err = e as DOMException;
+      const isQuota =
+        err?.name === "QuotaExceededError" ||
+        err?.name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+        err?.code === 22 ||
+        err?.code === 1014;
+
+      if (!isQuota || toSave.length <= 1) {
+        console.error("Failed to save conversations:", e);
+        return;
+      }
+
+      // Drop oldest 25% (tail of the desc-sorted list).
+      const dropCount = Math.max(1, Math.ceil(toSave.length * 0.25));
+      console.warn(
+        `[STORAGE] localStorage quota exceeded, dropping ${dropCount} oldest conversation(s) and retrying`,
+      );
+      toSave = toSave.slice(0, toSave.length - dropCount);
+    }
   }
+
+  console.error("[STORAGE] Failed to save conversations after multiple quota retries");
 }
 
 export function getConversation(id: string): Conversation | undefined {
@@ -97,23 +137,3 @@ export function saveTheme(theme: "dark" | "light"): void {
   }
 }
 
-// Onboarded flag — set when user clicks "Mulai Sekarang" on landing page.
-// Used as the gate to access the chat app (not real auth, just UX gate).
-export function getOnboarded(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return localStorage.getItem(ONBOARDED_KEY) === "true";
-  } catch (e) {
-    console.error("Failed to load onboarded flag:", e);
-    return false;
-  }
-}
-
-export function setOnboarded(value: boolean): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(ONBOARDED_KEY, value ? "true" : "false");
-  } catch (e) {
-    console.error("Failed to save onboarded flag:", e);
-  }
-}

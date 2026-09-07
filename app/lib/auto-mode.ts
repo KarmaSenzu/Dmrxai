@@ -32,7 +32,14 @@ const AGENTIC_PATTERNS = [
 ];
 
 // Web search triggers: temporal / current info queries. Reuse existing keywords.
-const WEB_SEARCH_PATTERNS = [
+//
+// Tightened to reduce false positives: broad intent verbs ("cari", "search",
+// "find", "google", "cek") used to trigger on their own and would fire on
+// generic prompts like "cari file di folder ini" or "find the bug". They have
+// been removed — only direct temporal/factual signals trigger web search now.
+// A user message that genuinely wants a web search will almost always mention
+// a temporal/factual cue ("terbaru", "today", "harga", "berita", etc.) too.
+const WEB_SEARCH_DIRECT_PATTERNS = [
   // English temporal
   /\blatest\b/i, /\bcurrent\b/i, /\brecent\b/i, /\bnews\b/i, /\btoday\b/i,
   /\bnow\b/i, /\bthis (week|month|year)\b/i, /\bin \d{4}\b/i,
@@ -43,8 +50,6 @@ const WEB_SEARCH_PATTERNS = [
   /\bminggu ini\b/i, /\bbulan ini\b/i, /\btahun ini\b/i,
   /\bberita\b/i, /\bharga\b/i, /\bcuaca\b/i, /\bskor\b/i,
   /\bsiapa (yang )?(menang|jadi)\b/i,
-  // Direct search intent
-  /\b(cari(?:kan)?|search|find|google|cek)\b/i,
 ];
 
 // Thinking triggers: math/logic/proof/complex reasoning
@@ -123,15 +128,19 @@ export function detectIntent(input: IntentDetectionInput): IntentDetectionResult
   // Check web search last (lowest specificity but most common).
   // Skip if URL is in text — URL fetching is already handled separately.
   if (!hasUrl) {
-    const searchHit = WEB_SEARCH_PATTERNS.find((re) => re.test(text));
-    if (searchHit) {
-      signals.push(`web-search:${searchHit.source.slice(0, 30)}`);
+    const directHit = WEB_SEARCH_DIRECT_PATTERNS.find((re) => re.test(text));
+    if (directHit) {
+      signals.push(`web-search:${directHit.source.slice(0, 30)}`);
       return {
         effectiveMode: "web-search",
         reason: "Terdeteksi butuh info terkini dari web",
         signals,
       };
     }
+    // Broad intent verbs alone are too noisy ("cari file ini") — only trigger
+    // when paired with a direct temporal/factual signal. Since the direct
+    // check above already handles that pairing, the intent-only branch is
+    // intentionally a no-op.
   }
 
   // Default — no auto-switch.

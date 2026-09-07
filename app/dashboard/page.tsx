@@ -2,11 +2,30 @@
 
 import { useEffect } from "react";
 
+/**
+ * Validate that a candidate dashboard URL is an absolute http(s) URL we can
+ * safely redirect to. Returns null if invalid. We deliberately do NOT use
+ * the server-only url-guard here because this component runs in the browser;
+ * the operator-supplied env var is trusted to point at the real dashboard.
+ */
+function resolveDashboardUrl(raw: string | undefined): string | null {
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== "https:" && u.protocol !== "http:") return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
 export default function DashboardPage() {
   useEffect(() => {
-    // Redirect ke dashboard eksternal
-    // URL ini menunjuk ke dashboard eksternal yang dikonfigurasi oleh deployment.
-    window.location.href = "http://localhost:1431/";
+    // External dashboard URL is configured by deployment via env var.
+    // If unset or invalid, fall back to the app root rather than a hardcoded
+    // localhost target.
+    const dashboardUrl = resolveDashboardUrl(process.env.NEXT_PUBLIC_DASHBOARD_URL);
+    window.location.href = dashboardUrl ?? "/";
   }, []);
 
   return (

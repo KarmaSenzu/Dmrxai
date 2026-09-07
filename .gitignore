@@ -47,3 +47,16 @@ cloudflared-config/config.yml
 
 # Local backups of old git history (do NOT commit)
 .git_backup_*/
+
+# Application log files
+logs/*.log
+
+# Test coverage output
+coverage/
+
+# Local tool config (Kilo AI, etc.)
+.kilo/
+
+# Sandbox workspace (ephemeral — lihat docs/SELF_HOSTED_APP_BUILDER.md)
+sandboxes/
+exports/

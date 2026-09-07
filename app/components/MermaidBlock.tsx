@@ -1,20 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import DOMPurify from "isomorphic-dompurify";
 
 interface MermaidBlockProps {
   code: string;
 }
-
-let idCounter = 0;
-const nextId = () => `mermaid-${Date.now()}-${idCounter++}`;
 
 export default function MermaidBlock({ code }: MermaidBlockProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [svg, setSvg] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState(true);
-  const idRef = useRef<string>(nextId());
+  const reactId = useId();
+  // mermaid IDs must be valid CSS selectors; replace ":" produced by useId.
+  const idRef = useRef<string>(`mermaid-${reactId.replace(/:/g, "-")}`);
 
   // TODO: re-render on theme change
   useEffect(() => {
@@ -69,7 +69,11 @@ export default function MermaidBlock({ code }: MermaidBlockProps) {
 
         const { svg: rendered } = await mermaid.render(idRef.current, code);
         if (!cancelled) {
-          setSvg(rendered);
+          // Sanitize SVG before injecting via dangerouslySetInnerHTML.
+          const sanitized = DOMPurify.sanitize(rendered, {
+            USE_PROFILES: { svg: true, svgFilters: true },
+          });
+          setSvg(sanitized);
           setLoading(false);
         }
       } catch (err: unknown) {

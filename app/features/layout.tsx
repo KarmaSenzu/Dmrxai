@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 
+// ISR: regenerate the static shell at most every hour
+export const revalidate = 3600;
+
 export const metadata: Metadata = {
   title: "Fitur — Dmr x AI",
   description:

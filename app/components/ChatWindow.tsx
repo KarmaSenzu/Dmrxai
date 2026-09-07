@@ -33,10 +33,14 @@ export default function ChatWindow({
 }: ChatWindowProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom. Depend on the message count + active conversation
+  // id rather than the messages array reference — useChat builds a new
+  // array on every streaming chunk, so depending on `messages` itself fires
+  // smooth-scroll on every token. Length + id is enough to capture the
+  // "new message arrived / switched conversation" cases that matter.
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [conversation?.messages]);
+  }, [conversation?.messages?.length, conversation?.id]);
 
   // Render the active-model badge as a header element. Defined inline so
   // both the empty and populated states can reuse the same markup.

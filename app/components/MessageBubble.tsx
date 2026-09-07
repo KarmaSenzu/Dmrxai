@@ -2,8 +2,17 @@
 
 import { Message, Attachment, ToolCall } from "@/lib/types";
 import MarkdownRenderer from "./MarkdownRenderer";
-import { User, Bot, Copy, Check, ChevronDown, ChevronUp, ChevronRight, Brain, Search, FileText, Loader2 } from "lucide-react";
-import * as LucideIcons from "lucide-react";
+import { User, Bot, Copy, Check, ChevronDown, ChevronUp, ChevronRight, Brain, Search, FileText, Loader2, Link2, BarChart3, Wrench, type LucideIcon } from "lucide-react";
+
+// Explicit icon map for dynamic tool icon resolution. Avoids
+// `import * as LucideIcons` which pulls the entire icon set into the bundle.
+// Keep keys in sync with `toolIconName` in app/lib/tools.ts.
+const TOOL_ICONS: Record<string, LucideIcon> = {
+  Search,
+  Link2,
+  BarChart3,
+  Wrench,
+};
 import { useState, useMemo, useEffect } from "react";
 import {
   formatModelDisplayName,
@@ -90,8 +99,7 @@ function formatFileSize(bytes: number): string {
 // Resolve a lucide icon dynamically by name (used by tool invocation cards).
 function ToolIcon({ name, size = 14 }: { name: string; size?: number }) {
   const iconName = toolIconName(name);
-  const Icon = (LucideIcons as unknown as Record<string, React.ComponentType<{ size?: number; className?: string }>>)[iconName];
-  if (!Icon) return null;
+  const Icon = TOOL_ICONS[iconName] ?? Wrench;
   return <Icon size={size} />;
 }
 
@@ -231,10 +239,14 @@ export default function MessageBubble({ message, isStreaming }: MessageBubblePro
     return null;
   }
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(response || message.content);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(response || message.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.warn("Clipboard write failed:", err);
+    }
   };
 
   const isDeepResearch = thinking.length > 2000;

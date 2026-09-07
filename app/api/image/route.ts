@@ -1,11 +1,43 @@
 import { NextRequest } from "next/server";
 import { resolveAIConfig } from "@/lib/server-config";
+import { requireUser } from "@/lib/auth-server";
+import { createLogger } from "@/lib/logger";
+import { validateUrl, UrlGuardError, getAllowedHostsFromEnv } from "@/lib/url-guard";
+import { readJsonWithLimit, DEFAULT_MAX_BODY } from "@/lib/body-limit";
+import { enforceRateLimit } from "@/lib/rate-limit";
+import { sanitizeUpstreamError } from "@/lib/sanitize-error";
+
+const log = createLogger("api/image");
 
 export const runtime = "edge";
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    log.info("POST", "Request received");
+
+    // Auth gate — image generation is a protected route.
+    let user;
+    try {
+      user = await requireUser(req);
+    } catch (response) {
+      return response as Response;
+    }
+
+    // Rate limit: image generation is expensive, lower per-user budget.
+    const limited = enforceRateLimit(
+      req,
+      { limit: 20, windowMs: 60_000, prefix: "image" },
+      user.id,
+    );
+    if (limited) return limited;
+
+    let body: Record<string, unknown>;
+    try {
+      body = await readJsonWithLimit<Record<string, unknown>>(req, DEFAULT_MAX_BODY);
+    } catch (err) {
+      if (err instanceof Response) return err;
+      throw err;
+    }
     const {
       prompt,
       negativePrompt,
@@ -16,13 +48,35 @@ export async function POST(req: NextRequest) {
       n,
       apiKey: userApiKey,
       baseUrl: userBaseUrl,
-    } = body;
+    } = body as {
+      prompt?: string;
+      negativePrompt?: string;
+      model?: string;
+      size?: string;
+      quality?: string;
+      style?: string;
+      n?: number;
+      apiKey?: string;
+      baseUrl?: string;
+    };
 
     // Server-side override kalau env di-set, kalau tidak fallback ke body.
-    const { apiKey, baseUrl } = resolveAIConfig({
-      apiKey: userApiKey,
-      baseUrl: userBaseUrl,
-    });
+    let apiKey: string;
+    let baseUrl: string;
+    try {
+      const cfg = resolveAIConfig({
+        apiKey: userApiKey,
+        baseUrl: userBaseUrl,
+      });
+      apiKey = cfg.apiKey;
+      baseUrl = cfg.baseUrl;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Invalid AI config";
+      return new Response(
+        JSON.stringify({ error: message }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
 
     // Validate required fields
     if (!prompt || !apiKey || !baseUrl || !model) {
@@ -30,6 +84,21 @@ export async function POST(req: NextRequest) {
         JSON.stringify({ error: "Missing required fields: prompt, apiKey, baseUrl, model" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
+    }
+
+    // SSRF guard: validate baseUrl points to a public AI provider host.
+    try {
+      validateUrl(baseUrl, {
+        allowedHosts: getAllowedHostsFromEnv("ALLOWED_AI_HOSTS"),
+      });
+    } catch (e) {
+      if (e instanceof UrlGuardError) {
+        return new Response(
+          JSON.stringify({ error: "Invalid baseUrl: " + e.code }),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      throw e;
     }
 
     // Normalize base URL
@@ -49,9 +118,10 @@ export async function POST(req: NextRequest) {
       requestBody.quality = quality || "standard";
       requestBody.style = style || "natural";
     }
-
     // Some providers support response_format
     requestBody.response_format = "b64_json";
+
+    log.debug("POST", "Calling image generation API", { model, endpoint });
 
     const response = await fetch(endpoint, {
       method: "POST",
@@ -72,7 +142,7 @@ export async function POST(req: NextRequest) {
         errorMessage = errorText;
       }
       return new Response(
-        JSON.stringify({ error: `Image generation failed (${response.status}): ${errorMessage}` }),
+        JSON.stringify({ error: `Image generation failed (${response.status}): ${sanitizeUpstreamError(errorMessage)}` }),
         { status: response.status, headers: { "Content-Type": "application/json" } }
       );
     }
@@ -80,7 +150,8 @@ export async function POST(req: NextRequest) {
     const data = await response.json();
 
     // OpenAI format: { data: [{ url: "...", b64_json: "..." }] }
-    const images = data.data?.map((img: any) => ({
+    type ImageData = { url?: string; b64_json?: string; revised_prompt?: string };
+    const images = (data.data as ImageData[] | undefined)?.map((img) => ({
       url: img.url || null,
       b64Data: img.b64_json || null,
       revisedPrompt: img.revised_prompt || null,
@@ -92,9 +163,9 @@ export async function POST(req: NextRequest) {
     );
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Image generation failed";
-    console.error("Image API error:", error);
+    log.error("POST", "Image API error", { error: String(error) });
     return new Response(
-      JSON.stringify({ error: message }),
+      JSON.stringify({ error: sanitizeUpstreamError(message) || "Image generation failed" }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }

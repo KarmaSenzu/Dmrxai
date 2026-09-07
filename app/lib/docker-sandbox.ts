@@ -1,0 +1,300 @@
+// app/lib/docker-sandbox.ts
+//
+// Docker-backed sandbox adapter for the App Builder.
+//
+// This implements the same `E2BSandbox` / `E2BSdkAdapter` interfaces defined in
+// `e2b-sandbox.ts`, but backed by the local Docker daemon instead of the E2B
+// cloud. Because dmrxai is self-hosted on a 16 GB server, running a container
+// per project is effectively free (no per-second sandbox billing) while still
+// giving us a real filesystem + shell + dev server.
+//
+// Security model (see docs/SELF_HOSTED_APP_BUILDER.md §15/§17):
+//   - Each sandbox is a container on a dedicated network with egress allowlist
+//     (only `registry.npmjs.org`) so the user can `npm install` but cannot
+//     reach the internal network, 9Router, or the LLM provider.
+//   - read-only rootfs + resource limits + dropped capabilities.
+//   - The Docker socket is NEVER exposed to the sandbox.
+//
+// Like `e2b-sandbox.ts`, this module is server-only and lazily loads `dockerode`
+// so the client/Edge bundle never pulls it in. The Docker client is injectable
+// for tests.
+
+import "server-only";
+
+import { createLogger } from "@/lib/logger";
+import type { E2BSandbox, E2BSdkAdapter, SandboxFs, SandboxProcess } from "@/lib/e2b-sandbox";
+
+const log = createLogger("docker-sandbox");
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+/** Result of `client.createContainer` — a handle to a single container. */
+export interface DockerContainer {
+  id: string;
+  start(): Promise<unknown>;
+  stop(): Promise<unknown>;
+  remove(): Promise<unknown>;
+  exec(opts: Record<string, unknown>): Promise<DockerExec>;
+}
+
+export interface DockerExec {
+  start(opts: { hijack?: boolean; stdin?: boolean }): Promise<NodeJS.ReadableStream>;
+  inspect(): Promise<{ exitCode: number }>;
+}
+
+/** Minimal shape of the dockerode client we depend on. */
+export interface DockerClient {
+  createContainer(opts: Record<string, unknown>): Promise<DockerContainer>;
+  getContainer(id: string): DockerContainer;
+}
+
+/** Options that shape how a sandbox container is created. */
+export interface DockerSandboxOptions {
+  /** Host directory mounted as the project workspace. */
+  workspaceHostDir: string;
+  /** Container path for the workspace (default /workspace). */
+  workspaceContainerPath?: string;
+  /** Docker image to run. */
+  image?: string;
+  /** Public base for preview URLs, e.g. "https://dmrxai.devplay.online". */
+  previewBaseHost?: string;
+  /** Resource limits (e.g. "512m", "0.5", 128). */
+  memLimit?: string;
+  cpus?: string;
+  pidsLimit?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Config helpers
+// ---------------------------------------------------------------------------
+
+function env(name: string, fallback: string): string {
+  return process.env[name]?.trim() || fallback;
+}
+
+const DEFAULT_IMAGE = env("DMRXAI_SANDBOX_IMAGE", "node:20-alpine");
+const DEFAULT_WORKSPACE = "/workspace";
+
+// ---------------------------------------------------------------------------
+// Docker client loading (lazy + injectable for tests)
+// ---------------------------------------------------------------------------
+
+let injectedClient: DockerClient | null = null;
+let clientInitTried = false;
+let loadedClient: DockerClient | null = null;
+
+/** Test-only: inject a fake Docker client. */
+export function _setDockerClientForTest(client: DockerClient | null): void {
+  injectedClient = client;
+  clientInitTried = false;
+  loadedClient = null;
+}
+
+function loadDockerClient(): DockerClient {
+  if (injectedClient) return injectedClient;
+  if (clientInitTried && loadedClient) return loadedClient;
+  clientInitTried = true;
+
+  try {
+    const dynamicRequire = new Function("m", "return require(m)") as (
+      m: string,
+    ) => unknown;
+    const Docker = dynamicRequire("dockerode") as
+      | { default?: new (opts?: unknown) => DockerClient }
+      | (new (opts?: unknown) => DockerClient);
+
+    const Ctor = typeof Docker === "function" ? Docker : Docker?.default;
+    if (!Ctor) {
+      throw new Error("dockerode loaded but no constructor found");
+    }
+    loadedClient = new Ctor();
+    return loadedClient;
+  } catch (e) {
+    log.error("loadDockerClient", "Failed to load dockerode", { error: String(e) });
+    throw new Error(
+      "dockerode is not installed or the Docker daemon is unreachable. Run `npm install dockerode`.",
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Sandbox implementation
+// ---------------------------------------------------------------------------
+
+class DockerSandbox implements E2BSandbox {
+  public readonly sandboxId: string;
+  public readonly files: SandboxFs;
+  public readonly process: SandboxProcess;
+  private container: DockerContainer;
+  private workspace: string;
+  private previewBaseHost: string;
+  private stopped = false;
+
+  constructor(container: DockerContainer, opts: DockerSandboxOptions) {
+    this.container = container;
+    this.sandboxId = container.id;
+    this.workspace = opts.workspaceContainerPath ?? DEFAULT_WORKSPACE;
+    this.previewBaseHost = opts.previewBaseHost ?? "https://dmrxai.devplay.online";
+
+    this.files = {
+      write: (path, content) => this.writeFile(path, content),
+      read: (path) => this.readFile(path),
+      remove: (path) => this.removeFile(path),
+      list: (dir) => this.listFiles(dir),
+    };
+
+    this.process = {
+      start: (o) => this.exec(o.cmd, o.onStdout, o.onStderr),
+    };
+  }
+
+  private toContainerPath(path: string): string {
+    const p = path.replace(/^\/+/, "");
+    return `${this.workspace}/${p}`;
+  }
+
+  private async writeFile(path: string, content: string): Promise<unknown> {
+    const containerPath = this.toContainerPath(path);
+    const dir = containerPath.slice(0, containerPath.lastIndexOf("/"));
+    // Write via a heredoc so content with quotes/backslashes is safe.
+    const cmd = `mkdir -p '${dir}' && cat > '${containerPath}' <<'DMRXAI_EOF'\n${content}\nDMRXAI_EOF`;
+    return this.exec(cmd);
+  }
+
+  private async readFile(path: string): Promise<string> {
+    const containerPath = this.toContainerPath(path);
+    const res = await this.exec(`cat '${containerPath}'`);
+    return res.stdout;
+  }
+
+  private async removeFile(path: string): Promise<unknown> {
+    const containerPath = this.toContainerPath(path);
+    return this.exec(`rm -f '${containerPath}'`);
+  }
+
+  private async listFiles(
+    dir?: string,
+  ): Promise<Array<{ name: string; type: "file" | "dir"; path: string }>> {
+    const target = dir ? this.toContainerPath(dir) : this.workspace;
+    const res = await this.exec(
+      `find '${target}' -maxdepth 1 -mindepth 1 -printf '%f\\t%y\\n' 2>/dev/null`,
+    );
+    const entries: Array<{ name: string; type: "file" | "dir"; path: string }> = [];
+    for (const line of res.stdout.split("\n")) {
+      if (!line.trim()) continue;
+      const [name, kind] = line.split("\t");
+      if (!name) continue;
+      const relPath = (dir ? dir.replace(/\/+$/, "") + "/" : "/") + name;
+      entries.push({
+        name,
+        type: kind === "d" ? "dir" : "file",
+        path: relPath,
+      });
+    }
+    return entries;
+  }
+
+  private async exec(
+    cmd: string,
+    onStdout?: (data: string) => void,
+    onStderr?: (data: string) => void,
+  ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+    const execHandle = await this.container.exec({
+      Cmd: ["sh", "-c", cmd],
+      AttachStdout: true,
+      AttachStderr: true,
+    });
+
+    let stdout = "";
+    let stderr = "";
+    const stream = await execHandle.start({ hijack: true, stdin: false });
+    await new Promise<void>((resolve) => {
+      stream.on("data", (chunk: Buffer | string) => {
+        const text = chunk.toString();
+        // In hijack mode docker multiplexes stdout/stderr with an 8-byte
+        // header per frame. For our logging/usage we merge into stdout;
+        // production callers that need exact separation can parse the header.
+        stdout += text;
+        onStdout?.(text);
+      });
+      stream.on("end", resolve);
+      stream.on("error", resolve);
+    });
+    const inspect = await execHandle.inspect();
+    return { exitCode: inspect.exitCode, stdout, stderr };
+  }
+
+  getHost(port: number): string {
+    // Preview URL pattern: https://<projectId>.dmrxai.devplay.online
+    // (the wildcard reverse proxy maps subdomain → this container's port).
+    const host = this.previewBaseHost.replace(/\/+$/, "");
+    return `${host}:${port}`;
+  }
+
+  async kill(): Promise<unknown> {
+    if (this.stopped) return;
+    this.stopped = true;
+    try {
+      await this.container.stop();
+    } catch (e) {
+      log.warn("kill", "container stop failed", { sandboxId: this.sandboxId, error: String(e) });
+    }
+    try {
+      await this.container.remove();
+    } catch (e) {
+      log.warn("kill", "container remove failed", { sandboxId: this.sandboxId, error: String(e) });
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Adapter
+// ---------------------------------------------------------------------------
+
+export class DockerAdapter implements E2BSdkAdapter {
+  constructor(private opts: DockerSandboxOptions) {}
+
+  async create(
+    _template: string,
+    _opts?: { timeoutMs?: number },
+  ): Promise<E2BSandbox> {
+    const client = loadDockerClient();
+    const image = this.opts.image ?? DEFAULT_IMAGE;
+    const workspace = this.opts.workspaceContainerPath ?? DEFAULT_WORKSPACE;
+
+    const container = await client.createContainer({
+      Image: image,
+      Cmd: ["sleep", "infinity"], // keep alive; agent drives it via exec
+      WorkingDir: workspace,
+      HostConfig: {
+        Binds: [`${this.opts.workspaceHostDir}:${workspace}`],
+        Memory: this.opts.memLimit ? parseInt(this.opts.memLimit, 10) : 512 * 1024 * 1024,
+        NanoCpus: this.opts.cpus ? Math.floor(parseFloat(this.opts.cpus) * 1e9) : 500_000_000,
+        PidsLimit: this.opts.pidsLimit ?? 128,
+        ReadonlyRootfs: true,
+        CapDrop: ["ALL"],
+        SecurityOpt: ["no-new-privileges:true"],
+        NetworkMode: "dmrxai-sandbox-net",
+      },
+    });
+
+    await container.start();
+    log.info("create", "Sandbox container started", {
+      containerId: container.id,
+      image,
+      workspaceHostDir: this.opts.workspaceHostDir,
+    });
+
+    return new DockerSandbox(container, this.opts);
+  }
+
+  async connect(sandboxId: string): Promise<E2BSandbox> {
+    const client = loadDockerClient();
+    const container = client.getContainer(sandboxId);
+    return new DockerSandbox(container, this.opts);
+  }
+}
+
+export default DockerAdapter;

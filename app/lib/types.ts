@@ -79,6 +79,15 @@ export interface ChatRequest {
   stream: boolean;
 }
 
+// TODO(security/bundle): The full systemPrompt below is shipped to the
+// browser because this module is imported by client components. It exposes
+// internal persona/routing rules and bloats the JS bundle. To fix:
+//   1. Move the prompt body into `app/lib/server-prompts.ts` (server-only).
+//   2. Keep DEFAULT_SETTINGS here with `systemPrompt: ""` so client imports
+//      stay typed.
+//   3. Have `app/api/chat/route.ts` inject the real prompt server-side.
+// Tracking as a dedicated follow-up to avoid touching every client import
+// in this wave.
 export const DEFAULT_SETTINGS: Settings = {
   apiKey: "",
   baseUrl: "",

@@ -1,11 +1,18 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { Message, Conversation, Settings, ChatMode, Attachment, ToolCall } from "@/lib/types";
 import { saveConversation, getConversations, deleteConversation as deleteConv, saveConversations } from "@/lib/storage";
 import { executeTool } from "@/lib/tools";
 import { detectIntent } from "@/lib/auto-mode";
+import {
+  getConversationsFromDB,
+  saveConversationToDB,
+  deleteConversationFromDB,
+  clearAllConversationsFromDB,
+} from "@/lib/chat-db";
+import { getSupabaseBrowser } from "@/lib/supabase-browser";
 
 export interface UseChatOptions {
   // When true, the server has baked-in AI_API_KEY + AI_BASE_URL via env, so
@@ -97,11 +104,65 @@ export function useChat(settings: Settings, options: UseChatOptions = {}) {
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Load conversations from localStorage
+  // Mirror of `conversations` for use inside callbacks. Reading from a ref
+  // means sendMessage doesn't have to list `conversations` in its dep array,
+  // which would otherwise re-create the callback (and therefore re-create
+  // the AbortController) on every message — breaking stop/abort semantics
+  // and inflating downstream useEffect cycles.
+  const conversationsRef = useRef<Conversation[]>([]);
+  useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
+
+  // Per-conversation debounce timers for DB writes. localStorage is the
+  // instant-paint cache; DB is the source of truth but tolerated to lag.
+  const dbSaveTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+
+  const debouncedDBSave = useCallback((conv: Conversation) => {
+    const existing = dbSaveTimers.current.get(conv.id);
+    if (existing) clearTimeout(existing);
+
+    const t = setTimeout(() => {
+      void saveConversationToDB(conv).catch(() => {});
+      dbSaveTimers.current.delete(conv.id);
+    }, 1500);
+
+    dbSaveTimers.current.set(conv.id, t);
+  }, []);
+
+  // Load conversations: localStorage first for instant paint, then DB merge.
+  // DB takes precedence on matching IDs so other devices/sessions win.
   const loadConversations = useCallback(() => {
-    const saved = getConversations();
-    setConversations(saved);
-    return saved;
+    const localConvs = getConversations();
+    if (localConvs.length > 0) {
+      setConversations(localConvs);
+    }
+
+    void (async () => {
+      try {
+        const supabase = getSupabaseBrowser();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const dbConvs = await getConversationsFromDB();
+        if (dbConvs.length === 0) return;
+
+        // Merge: DB wins for matching IDs.
+        const merged = new Map<string, Conversation>();
+        for (const c of localConvs) merged.set(c.id, c);
+        for (const c of dbConvs) merged.set(c.id, c);
+        const final = Array.from(merged.values()).sort(
+          (a, b) => b.updatedAt - a.updatedAt
+        );
+        setConversations(final);
+        // Sync local cache to DB-fresh state.
+        for (const c of dbConvs) saveConversation(c);
+      } catch (e) {
+        console.error("[useChat] DB load failed:", e);
+      }
+    })();
+
+    return localConvs;
   }, []);
 
   // Get active conversation
@@ -121,15 +182,17 @@ export function useChat(settings: Settings, options: UseChatOptions = {}) {
       saveConversations(updated);
       return updated;
     });
+    debouncedDBSave(newConv);
     setActiveConversationId(newConv.id);
     setError(null);
     return newConv;
-  }, []);
+  }, [debouncedDBSave]);
 
   // Delete conversation
   const deleteConversation = useCallback(
     (id: string) => {
       deleteConv(id);
+      void deleteConversationFromDB(id).catch(() => {});
       setConversations((prev) => prev.filter((c) => c.id !== id));
       if (activeConversationId === id) {
         setActiveConversationId(null);
@@ -170,9 +233,20 @@ export function useChat(settings: Settings, options: UseChatOptions = {}) {
 
       setError(null);
 
-      // Get or create conversation
+      // Create abort controller upfront so URL pre-processing and search
+      // pre-processing fetches below can already honor it. Previously the
+      // controller was created right before the streaming fetch, leaving
+      // pre-processing fetches uninterruptible — a "Stop" click during
+      // search wouldn't actually cancel the in-flight /api/search request.
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
+
+      // Get or create conversation. Read the latest conversations snapshot
+      // from a ref so we don't have to list `conversations` in this
+      // callback's deps (re-creating it on every message would invalidate
+      // the AbortController + cause cascade re-renders downstream).
       let convId = activeConversationId;
-      let currentConversations = [...conversations];
+      let currentConversations = [...conversationsRef.current];
 
       if (!convId) {
         const newConv: Conversation = {
@@ -540,10 +614,9 @@ export function useChat(settings: Settings, options: UseChatOptions = {}) {
       });
       setConversations(currentConversations);
 
-      // Send request
+      // Send request. AbortController was already wired up at the top of
+      // sendMessage so URL/search pre-processing can be cancelled too.
       setIsLoading(true);
-      const abortController = new AbortController();
-      abortControllerRef.current = abortController;
 
       // Track which assistant placeholder is currently "live" — it shifts
       // each multi-turn iteration when we append a fresh placeholder for
@@ -794,6 +867,7 @@ export function useChat(settings: Settings, options: UseChatOptions = {}) {
             }
             const updated = { ...c, messages: msgs, updatedAt: Date.now() };
             saveConversation(updated);
+            debouncedDBSave(updated);
             return updated;
           });
           return final;
@@ -880,6 +954,7 @@ export function useChat(settings: Settings, options: UseChatOptions = {}) {
               });
               const updated = { ...c, messages: newMsgs, updatedAt: Date.now() };
               saveConversation(updated);
+              debouncedDBSave(updated);
               return updated;
             })
           );
@@ -928,6 +1003,7 @@ export function useChat(settings: Settings, options: UseChatOptions = {}) {
               }
               const updated = { ...c, messages: msgs, updatedAt: Date.now() };
               saveConversation(updated);
+              debouncedDBSave(updated);
               return updated;
             })
           );
@@ -939,6 +1015,7 @@ export function useChat(settings: Settings, options: UseChatOptions = {}) {
             const final = prev.map((c) => {
               if (c.id === convId) {
                 saveConversation(c);
+                debouncedDBSave(c);
               }
               return c;
             });
@@ -963,6 +1040,7 @@ export function useChat(settings: Settings, options: UseChatOptions = {}) {
                 }
                 const updated = { ...c, messages: msgs, updatedAt: Date.now() };
                 saveConversation(updated);
+                debouncedDBSave(updated);
                 return updated;
               }
               return c;
@@ -974,12 +1052,13 @@ export function useChat(settings: Settings, options: UseChatOptions = {}) {
         abortControllerRef.current = null;
       }
     },
-    [activeConversationId, conversations, isLoading, settings, serverManaged]
+    [activeConversationId, isLoading, settings, serverManaged, debouncedDBSave]
   );
 
   // Clear all conversations
   const clearAllConversations = useCallback(() => {
     saveConversations([]);
+    void clearAllConversationsFromDB().catch(() => {});
     setConversations([]);
     setActiveConversationId(null);
   }, []);

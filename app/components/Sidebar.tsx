@@ -1,9 +1,10 @@
 "use client";
 
 import { Conversation } from "@/lib/types";
-import { Plus, MessageSquare, Trash2, Settings, Sun, Moon, X, Menu, Eraser, Image as ImageIcon, Cpu, Lock, LogOut, Sparkles, Heart } from "lucide-react";
-import { useState } from "react";
+import { Plus, MessageSquare, Trash2, Settings, Sun, Moon, X, Menu, Eraser, Image as ImageIcon, Cpu, Lock, Sparkles, Hammer, ChevronRight, Heart } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { UserMenu } from "./UserMenu";
 
 export type AppMode = "chat" | "image";
 
@@ -17,7 +18,6 @@ interface SidebarProps {
   onOpenSettings: () => void;
   onOpenModels: () => void;
   onOpenDonation?: () => void;
-  onLogout: () => void;
   theme: "dark" | "light";
   onToggleTheme: () => void;
   mode: AppMode;
@@ -34,7 +34,6 @@ export default function Sidebar({
   onOpenSettings,
   onOpenModels,
   onOpenDonation,
-  onLogout,
   theme,
   onToggleTheme,
   mode,
@@ -42,15 +41,34 @@ export default function Sidebar({
 }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const deleteConfirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (deleteConfirmTimerRef.current) {
+        clearTimeout(deleteConfirmTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (deleteConfirm === id) {
       onDeleteConversation(id);
       setDeleteConfirm(null);
+      if (deleteConfirmTimerRef.current) {
+        clearTimeout(deleteConfirmTimerRef.current);
+        deleteConfirmTimerRef.current = null;
+      }
     } else {
       setDeleteConfirm(id);
-      setTimeout(() => setDeleteConfirm(null), 3000);
+      if (deleteConfirmTimerRef.current) {
+        clearTimeout(deleteConfirmTimerRef.current);
+      }
+      deleteConfirmTimerRef.current = setTimeout(() => {
+        setDeleteConfirm(null);
+        deleteConfirmTimerRef.current = null;
+      }, 3000);
     }
   };
 
@@ -111,7 +129,6 @@ export default function Sidebar({
         >
           <Cpu size={14} className="text-light-accent dark:text-dark-accent" />
           <span className="text-xs font-medium">Available Models</span>
-          <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-light-accent/10 dark:bg-dark-accent/10 text-light-accent dark:text-dark-accent font-semibold">129</span>
         </button>
 
         {/* New Chat button - only in chat mode */}
@@ -128,6 +145,29 @@ export default function Sidebar({
           </button>
         )}
       </div>
+
+      {/* App Builder CTA - prominent gradient card */}
+      {mode === "chat" && (
+        <Link
+          href="/builder"
+          onClick={() => setIsOpen(false)}
+          className="mx-3 mt-2 flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-gradient-to-br from-violet-500/15 via-fuchsia-500/10 to-violet-500/15 border border-violet-500/30 hover:border-violet-500/50 hover:from-violet-500/20 hover:to-fuchsia-500/20 transition group"
+        >
+          <div className="w-8 h-8 rounded-md bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center shrink-0 shadow-sm">
+            <Hammer size={15} className="text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-medium text-light-text dark:text-dark-text">App Builder</span>
+              <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-600 dark:text-violet-300 font-semibold">Beta</span>
+            </div>
+            <p className="text-[11px] text-light-muted dark:text-dark-muted leading-tight mt-0.5">
+              Bangun aplikasi React lengkap
+            </p>
+          </div>
+          <ChevronRight size={14} className="text-light-muted dark:text-dark-muted group-hover:translate-x-0.5 transition shrink-0" />
+        </Link>
+      )}
 
       {/* Conversation List - only in chat mode */}
       {mode === "chat" ? (
@@ -236,13 +276,11 @@ export default function Sidebar({
           <Heart size={16} />
           <span>Dukung Server</span>
         </button>
-        <button
-          onClick={onLogout}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-500/70 hover:bg-red-500/10 hover:text-red-500 transition-colors"
-        >
-          <LogOut size={16} />
-          <span>Logout</span>
-        </button>
+
+        {/* User account */}
+        <div className="pt-2 mt-1 border-t border-light-border dark:border-dark-border">
+          <UserMenu />
+        </div>
       </div>
     </div>
   );
