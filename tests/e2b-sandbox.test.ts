@@ -172,4 +172,26 @@ describe("SandboxManager", () => {
     expect(mgr.isConfigured()).toBe(false);
     // E2B_API_KEY is not set in the happy-dom test env.
   });
+
+  it("reaps least-recently-used when at max sandbox quota", async () => {
+    // Create 15 sandboxes (the hard cap), then a 16th — the oldest should be
+    // reaped so total stays at 15.
+    const mgr = new SandboxManager({ sweepIntervalMs: 0 });
+    for (let i = 0; i < 15; i++) {
+      await mgr.getOrCreate(`p${i}`, "u1");
+    }
+    expect(mgr.size()).toBe(15);
+
+    // Advance time so "p0" is clearly the LRU.
+    vi.advanceTimersByTime(1000);
+    // Touch p1..p14 so p0 becomes the oldest.
+    for (let i = 1; i < 15; i++) {
+      await mgr.getOrCreate(`p${i}`, "u1");
+    }
+
+    // Creating a 16th should reap the LRU (p0) and stay at 15.
+    await mgr.getOrCreate("p16", "u1");
+    expect(mgr.size()).toBe(15);
+    await mgr.dispose();
+  });
 });

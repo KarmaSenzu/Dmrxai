@@ -150,7 +150,8 @@ export interface SandboxManagerOptions {
 }
 
 const DEFAULT_TEMPLATE = "base";
-const DEFAULT_IDLE_TIMEOUT_MS = 15 * 60 * 1000; // 15 min
+const DEFAULT_IDLE_TIMEOUT_MS = 3 * 24 * 60 * 60 * 1000; // 3 days (kelas + PR model)
+const MAX_SANDBOXES = 15; // hard cap on concurrent sandbox containers
 const DEFAULT_SWEEP_INTERVAL_MS = 60 * 1000; // 1 min
 
 export class SandboxManager {
@@ -221,6 +222,13 @@ export class SandboxManager {
     if (existing) {
       existing.lastUsedAt = Date.now();
       return existing.sandbox;
+    }
+
+    // Enforce the max-sandbox quota: if we're at capacity, reap the least
+    // recently used sandbox first so a new project can still be served without
+    // unbounded container growth.
+    if (this.entries.size >= MAX_SANDBOXES) {
+      await this.reapLeastRecentlyUsed();
     }
 
     const sdk = loadSdk();
@@ -300,6 +308,32 @@ export class SandboxManager {
       log.info("sweepIdle", "Swept idle sandboxes", { count: stale.length });
     }
     return stale.length;
+  }
+
+  /** Reap the least-recently-used sandbox (used when at the max quota). */
+  private async reapLeastRecentlyUsed(): Promise<void> {
+    let oldestKey: string | null = null;
+    let oldestEntry: SandboxEntry | null = null;
+    for (const [key, entry] of Array.from(this.entries.entries())) {
+      if (!oldestEntry || entry.lastUsedAt < oldestEntry.lastUsedAt) {
+        oldestKey = key;
+        oldestEntry = entry;
+      }
+    }
+    if (!oldestKey || !oldestEntry) return;
+    this.entries.delete(oldestKey);
+    try {
+      await oldestEntry.sandbox.kill();
+      log.info("reapLeastRecentlyUsed", "Reaped LRU sandbox", {
+        sandboxId: oldestEntry.sandbox.sandboxId,
+        projectId: oldestEntry.projectId,
+      });
+    } catch (e) {
+      log.warn("reapLeastRecentlyUsed", "kill failed", {
+        sandboxId: oldestEntry.sandbox.sandboxId,
+        error: String(e),
+      });
+    }
   }
 }
 
