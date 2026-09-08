@@ -13,8 +13,17 @@ services:
     container_name: dmrxai-app
     restart: unless-stopped
     networks: [dmrxai-net]
+    group_add:
+      - "999" # docker group (host) — akses /var/run/docker.sock via dockerode
     expose:
       - "3000"
+    volumes:
+      # Docker daemon access for App Builder sandbox (dockerode).
+      # Hanya di-mount ke app (bukan sandbox). Sandbox TIDAK pernah dapat socket ini.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Sandbox workspaces (base dir per-project). Container app membuat
+      # subfolder /srv/dmrxai/sandboxes/sb-<projectId>/project di sini.
+      - ${DMRXAI_SANDBOX_DIR:-/srv/dmrxai/sandboxes}:/srv/dmrxai/sandboxes
     environment:
       NODE_ENV: production
       PORT: "3000"
@@ -33,7 +42,7 @@ services:
       # App Builder sandbox (Docker self-host by default, E2B alternative)
       DMRXAI_SANDBOX_PROVIDER: ${DMRXAI_SANDBOX_PROVIDER:-docker}
       DMRXAI_SANDBOX_DIR: ${DMRXAI_SANDBOX_DIR:-/srv/dmrxai/sandboxes}
-      DMRXAI_PREVIEW_HOST: ${DMRXAI_PREVIEW_HOST:-https://dmrxai.devplay.online}
+      DMRXAI_PREVIEW_HOST: ${DMRXAI_PREVIEW_HOST:-https://preview.devplay.online}
       DMRXAI_SANDBOX_IMAGE: ${DMRXAI_SANDBOX_IMAGE:-node:20-alpine}
       E2B_API_KEY: ${E2B_API_KEY:-}
       E2B_TEMPLATE: ${E2B_TEMPLATE:-base}
@@ -48,6 +57,32 @@ services:
       - NET_BIND_SERVICE
     security_opt:
       - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: dmrxai-preview
+    restart: unless-stopped
+    networks: [dmrxai-net, dmrxai-sandbox-net]
+    expose:
+      - "8080"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+    cap_drop: [ALL]
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
     logging:
       driver: "json-file"
       options:
@@ -140,3 +175,10 @@ networks:
   dmrxai-net:
     name: dmrxai-net
     driver: bridge
+  dmrxai-sandbox-net:
+    name: dmrxai-sandbox-net
+    external: true
+
+volumes:
+  caddy-data:
+  caddy-config:
