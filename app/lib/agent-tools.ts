@@ -147,7 +147,8 @@ export const BUILDER_TOOLS: ToolDefinition[] = [
         properties: {
           summary: {
             type: "string",
-            description: "Brief summary of what was accomplished (1-3 sentences, in the user's language)",
+            description:
+              "Ringkasan hasil build dalam bahasa user, diformat sebagai markdown singkat dan rapi: mulai dengan satu kalimat pembuka, lalu gunakan bullet list (- ) untuk daftar fitur/halaman/section yang sudah dibuat. Contoh:\n\"Landing page portofolio dmrxai selesai dibuat.\n\nYang sudah dibuat:\n- Hero section dengan CTA\n- Fitur unggulan (3 cards)\n- Footer lengkap\"",
           },
         },
         required: ["summary"],
@@ -274,6 +275,19 @@ Kamu sedang implement kode berdasarkan plan yang sudah disetujui atau request us
    - File baru → create_file(path, content)
    - File existing → apply_diff(path, diff) dengan SEARCH/REPLACE
 5. Setelah selesai semua, panggil done(summary).
+
+## FORMAT SUMMARY (done)
+Summary harus ringkas & terstruktur (markdown), BUKAN satu paragraf panjang:
+- Kalimat pembuka singkat (apa yang dibuat).
+- Bullet list (- ) berisi fitur/halaman/section utama.
+- Jangan tulis detail teknis panjang (dependency, config) di summary.
+- Contoh:
+  "Landing page portofolio dmrxai selesai dibuat.
+
+  Yang sudah dibuat:
+  - Hero section dengan CTA
+  - Fitur unggulan (3 cards)
+  - Footer lengkap"
 
 ## EFISIENSI TOKEN
 - Edit kecil → SELALU apply_diff.

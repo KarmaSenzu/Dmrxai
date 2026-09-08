@@ -362,6 +362,9 @@ export async function POST(req: NextRequest) {
         // sandbox. We only emit preview_ready when this is true, so we never
         // point the iframe at a port with nothing listening (which caused 502).
         let devServerStarted = false;
+        // Whether the agent created/edited any files this run (so we can decide
+        // to auto-start the dev server even if the agent forgot to).
+        let filesTouchedThisRun = false;
 
         while (!sawDone && round < MAX_ROUNDS) {
           round++;
@@ -419,6 +422,10 @@ export async function POST(req: NextRequest) {
                 devServerStarted = true;
               }
             }
+            // Track file mutations so we can auto-start the dev server later.
+            if (parsed?.name === "create_file" || parsed?.name === "apply_diff") {
+              filesTouchedThisRun = true;
+            }
 
             messages.push({
               role: "tool",
@@ -436,9 +443,33 @@ export async function POST(req: NextRequest) {
           emitTerminal(`\n⚠ Max ${MAX_ROUNDS} rounds reached`);
         }
 
-        // Emit preview URL only when a dev server was actually started in the
-        // sandbox. Architect mode (plan-only, no files) never starts a dev
-        // server, so it must not emit a preview that would 502.
+        // Auto-start the dev server if the agent built files but never ran
+        // `npm run dev` itself. The agent frequently just create_file + done()
+        // without starting the dev server, which left the preview blank.
+        // We install deps + launch Vite in the background and emit preview_ready.
+        if (sandbox && !devServerStarted && (hasFiles || filesTouchedThisRun)) {
+          emit("status", { phase: "installing", message: "Menginstall dependencies..." });
+          try {
+            await sandbox.process.start({
+              cmd: "npm install",
+              onStdout: (c) => emitTerminal(c),
+              onStderr: (c) => emitTerminal(c),
+            });
+            emit("status", { phase: "starting", message: "Menjalankan dev server..." });
+            // Launch the dev server in the background (don't await — it blocks).
+            void sandbox.process.start({
+              cmd: "npm run dev -- --host 0.0.0.0 --port 5173",
+              onStdout: (c) => emitTerminal(c),
+              onStderr: (c) => emitTerminal(c),
+            });
+            devServerStarted = true;
+          } catch (e) {
+            log.warn("POST", "Failed to auto-start dev server", { error: String(e) });
+            emitTerminal(`⚠ Gagal menjalankan dev server: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+
+        // Emit preview URL once the dev server is (or will be) running.
         if (sandbox && devServerStarted) {
           const previewUrl = sandbox.getHost(5173);
           emit("preview_ready", { url: previewUrl });
