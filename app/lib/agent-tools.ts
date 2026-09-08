@@ -458,10 +458,11 @@ export function buildRelevantFiles(
   if (entries.length === 0) return "";
   
   // For small projects, include all files (capped at content size).
-  // 30k chars was too tight for larger projects — key files (src/App.tsx etc.)
-  // got truncated, so the agent "couldn't see" existing code and regenerated
-  // from scratch. Raise to 60k to cover typical Vite+React projects fully.
-  const MAX_TOTAL_CHARS = 60000;
+  // Keep the cap generous (~100k chars ≈ 25k tokens) so typical projects are
+  // fully visible to the agent without truncating key files. Beyond this we
+  // rely on scoring to pick the most relevant files rather than growing the
+  // context unbounded (which would risk exceeding the model's context window).
+  const MAX_TOTAL_CHARS = 100000;
   let totalChars = 0;
   const included: Array<[string, string]> = [];
   
