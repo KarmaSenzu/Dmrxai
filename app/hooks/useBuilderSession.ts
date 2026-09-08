@@ -398,9 +398,15 @@ export function useBuilderSession(
                 } else if (p === "mode") {
                   const m = msg as AgentMode;
                   setAgentMode(m);
-                } else {
+                } else if (p === "retrying") {
+                  // Only surface retries (rare + actionable); hide the noisy
+                  // [thinking]/[executing] status spam from the terminal.
                   setPhase(p as AgentPhase);
-                  if (msg) appendLog(`[${p}] ${msg}`);
+                  if (msg) appendLog(`[retry] ${msg}`);
+                } else {
+                  // thinking / executing / etc — update phase but keep the
+                  // terminal clean (user sees progress via Steps panel instead).
+                  setPhase(p as AgentPhase);
                 }
                 break;
               }
@@ -413,11 +419,27 @@ export function useBuilderSession(
                 };
                 setToolCalls((prev) => [...prev, tc]);
                 setPhase("executing");
+
+                // Friendly, minimal terminal line (no internal tool verb).
                 const pathArg =
                   typeof tc.args.path === "string"
                     ? (tc.args.path as string)
-                    : "...";
-                appendLog(`→ ${tc.name}(${pathArg})`);
+                    : "";
+                if (tc.name === "create_file") {
+                  appendLog(pathArg ? `Membuat ${pathArg}...` : "Membuat file...");
+                } else if (tc.name === "apply_diff") {
+                  appendLog(pathArg ? `Mengubah ${pathArg}...` : "Mengubah file...");
+                } else if (tc.name === "delete_file") {
+                  appendLog(pathArg ? `Menghapus ${pathArg}...` : "Menghapus file...");
+                } else if (tc.name === "run_command") {
+                  const cmd =
+                    typeof tc.args.command === "string" ? tc.args.command : "";
+                  appendLog(cmd ? `Menjalankan: ${cmd}` : "Menjalankan perintah...");
+                } else if (tc.name === "done") {
+                  // done() produces no user-facing terminal line.
+                } else {
+                  appendLog(tc.name);
+                }
                 persistStreamingMessage(runPid);
                 break;
               }
