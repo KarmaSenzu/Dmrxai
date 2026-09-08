@@ -22,6 +22,7 @@ const log = createLogger("useBuilderSession");
 export type AgentPhase =
   | "idle"
   | "loading"
+  | "sandbox"
   | "thinking"
   | "executing"
   | "saving"
@@ -398,6 +399,10 @@ export function useBuilderSession(
                 } else if (p === "mode") {
                   const m = msg as AgentMode;
                   setAgentMode(m);
+                } else if (p === "sandbox") {
+                  // Show sandbox lifecycle feedback (Menyiapkan sandbox...).
+                  setPhase("sandbox");
+                  if (msg) appendLog(msg);
                 } else if (p === "retrying") {
                   // Only surface retries (rare + actionable); hide the noisy
                   // [thinking]/[executing] status spam from the terminal.
@@ -541,7 +546,9 @@ export function useBuilderSession(
             }
           }
 
-          appendLog(`\n✅ ${summary}`);
+          // Keep the terminal concise — the full summary already lives in the
+          // chat bubble, so don't duplicate it here.
+          appendLog("\n✅ Selesai");
         }
       } catch (e) {
         if (!isMountedRef.current) return;

@@ -298,8 +298,10 @@ export async function POST(req: NextRequest) {
 
         // Acquire the sandbox for this project/user up-front. Fail fast with a
         // clear terminal error if the backend is unavailable.
+        emit("status", { phase: "sandbox", message: "Menyiapkan sandbox..." });
         try {
           sandbox = await getSandboxForBuilder().getOrCreate(projectId, user.id);
+          emit("status", { phase: "sandbox", message: "Sandbox siap" });
         } catch (e) {
           log.error("POST", "Failed to acquire sandbox", { error: String(e) });
           emit("error", {
