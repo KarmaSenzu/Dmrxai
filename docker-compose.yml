@@ -9,6 +9,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # NEXT_PUBLIC_* must be passed at build time (inlined into client bundle).
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-}
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
     image: dmrxai-app:latest
     container_name: dmrxai-app
     restart: unless-stopped

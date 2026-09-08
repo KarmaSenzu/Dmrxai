@@ -20,6 +20,15 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
+# NEXT_PUBLIC_* vars are inlined into the client bundle at BUILD time, so they
+# must be available here (via ARG + ENV), not just at container runtime.
+ARG NEXT_PUBLIC_APP_URL
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+ENV NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+
 # Build Next.js (output: standalone)
 RUN npm run build
 
