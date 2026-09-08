@@ -293,13 +293,30 @@ export async function POST(req: NextRequest) {
           return;
         }
 
-        // Resolve mode.
-        const hasFiles = false; // sandbox will provide file tree once wired in
+        // Resolve mode + read the current sandbox file tree so the agent knows
+        // what already exists (prevents "restart from scratch" on continuation).
+        let existingFilesMap: Record<string, string> = {};
+        try {
+          const entries = await sandbox.files.list();
+          for (const entry of entries) {
+            if (entry.type === "file") {
+              try {
+                existingFilesMap[entry.path] = await sandbox.files.read(entry.path);
+              } catch {
+                // ignore unreadable file
+              }
+            }
+          }
+        } catch (e) {
+          log.warn("POST", "Failed to list sandbox files", { error: String(e) });
+        }
+        const hasFiles = Object.keys(existingFilesMap).length > 0;
+
         let mode: AgentMode =
           requestedMode ??
           detectMode({ hasFiles, prompt, hasPlan: !!(planMarkdown && planMarkdown.trim().length > 0) });
 
-        log.debug("POST", "Agent mode resolved", { mode });
+        log.debug("POST", "Agent mode resolved", { mode, fileCount: Object.keys(existingFilesMap).length });
         emit("status", { phase: "mode", message: mode });
 
         // Build the LLM-shaped message history (system + user + assistant/tool).
@@ -314,7 +331,7 @@ export async function POST(req: NextRequest) {
           userPrompt: prompt,
           mode,
           projectPlan: planMarkdown ?? undefined,
-          existingFiles: undefined,
+          existingFiles: hasFiles ? existingFilesMap : undefined,
           history: [],
         });
         for (const m of built) {

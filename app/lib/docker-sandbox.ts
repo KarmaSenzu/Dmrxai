@@ -286,12 +286,27 @@ export class DockerAdapter implements E2BSdkAdapter {
         ? `${this.opts.workspaceBaseDir.replace(/\/+$/, "")}/${projectSlug}`
         : this.opts.workspaceHostDir;
 
+    // Deterministic container name so the reverse proxy (Caddy) can resolve
+    // `dmrxai-sb-<slug>` on the sandbox network via Docker DNS. Without a
+    // stable name, the wildcard preview routing cannot find the container.
+    const containerName = projectSlug
+      ? `dmrxai-sb-${projectSlug}`
+      : `dmrxai-sb-${Date.now().toString(36)}`;
+
     const container = await client.createContainer({
+      name: containerName,
       Image: image,
       Cmd: ["sleep", "infinity"], // keep alive; agent drives it via exec
       WorkingDir: workspace,
+      ExposedPorts: { "5173/tcp": {} },
+      Labels: {
+        "dmrxai.sandbox": "true",
+        "dmrxai.project_slug": projectSlug ?? "",
+        "dmrxai.preview_host": this.opts.previewBaseHost ?? "",
+      },
       HostConfig: {
         Binds: [`${workspaceHostDir}:${workspace}`],
+        PortBindings: { "5173/tcp": [{ HostPort: "0" }] },
         Memory: this.opts.memLimit ? parseInt(this.opts.memLimit, 10) : 512 * 1024 * 1024,
         NanoCpus: this.opts.cpus ? Math.floor(parseFloat(this.opts.cpus) * 1e9) : 500_000_000,
         PidsLimit: this.opts.pidsLimit ?? 128,
@@ -305,6 +320,7 @@ export class DockerAdapter implements E2BSdkAdapter {
     await container.start();
     log.info("create", "Sandbox container started", {
       containerId: container.id,
+      containerName,
       image,
       workspaceHostDir,
     });

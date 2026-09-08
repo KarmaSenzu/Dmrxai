@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import {
   SandboxManager,
   normalizeSandboxPath,
-  _setSdkForTest,
+  setSdkAdapter,
   _resetSandboxManagerForTest,
   type E2BSdkAdapter,
   type E2BSandbox,
@@ -93,7 +93,7 @@ describe("SandboxManager", () => {
 
   beforeEach(() => {
     sdk = makeFakeSdk();
-    _setSdkForTest(sdk);
+    setSdkAdapter(sdk);
     vi.useFakeTimers();
   });
 

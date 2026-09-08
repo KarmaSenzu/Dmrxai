@@ -30,7 +30,11 @@ services:
       SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
       # Donation feature (fitur-donate): forwards Trakteer API key into container
       TRAKTEER_API_KEY: ${TRAKTEER_API_KEY:-}
-      # E2B sandbox for the App Builder (filesystem + terminal + preview)
+      # App Builder sandbox (Docker self-host by default, E2B alternative)
+      DMRXAI_SANDBOX_PROVIDER: ${DMRXAI_SANDBOX_PROVIDER:-docker}
+      DMRXAI_SANDBOX_DIR: ${DMRXAI_SANDBOX_DIR:-/srv/dmrxai/sandboxes}
+      DMRXAI_PREVIEW_HOST: ${DMRXAI_PREVIEW_HOST:-https://dmrxai.devplay.online}
+      DMRXAI_SANDBOX_IMAGE: ${DMRXAI_SANDBOX_IMAGE:-node:20-alpine}
       E2B_API_KEY: ${E2B_API_KEY:-}
       E2B_TEMPLATE: ${E2B_TEMPLATE:-base}
     depends_on:
