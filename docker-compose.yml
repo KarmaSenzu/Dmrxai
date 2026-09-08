@@ -15,6 +15,10 @@ services:
     networks: [dmrxai-net]
     group_add:
       - "999" # docker group (host) — akses /var/run/docker.sock via dockerode
+    # Allow the app container to reach the host (9router native runs on the
+    # host, not in a container). Sandbox containers do NOT get this.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     expose:
       - "3000"
     volumes:
@@ -34,6 +38,9 @@ services:
       # pakai AI_API_KEY ini ke 9router internal.
       AI_BASE_URL: ${AI_BASE_URL:-http://9router:20128/v1}
       AI_API_KEY: ${AI_API_KEY:-}
+      # Allowlist host yang boleh di-fetch server (SSRF guard). Untuk 9router
+      # native via host.docker.internal, set ke host.docker.internal.
+      ALLOWED_AI_HOSTS: ${ALLOWED_AI_HOSTS:-}
       # Legacy: usage endpoint (opsional, kosongkan kalau tidak pakai)
       DMRXAI_API_URL: ${DMRXAI_API_URL:-}
       SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
