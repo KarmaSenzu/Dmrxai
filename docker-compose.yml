@@ -33,7 +33,7 @@ services:
       # App Builder sandbox (Docker self-host by default, E2B alternative)
       DMRXAI_SANDBOX_PROVIDER: ${DMRXAI_SANDBOX_PROVIDER:-docker}
       DMRXAI_SANDBOX_DIR: ${DMRXAI_SANDBOX_DIR:-/srv/dmrxai/sandboxes}
-      DMRXAI_PREVIEW_HOST: ${DMRXAI_PREVIEW_HOST:-https://dmrxai.devplay.online}
+      DMRXAI_PREVIEW_HOST: ${DMRXAI_PREVIEW_HOST:-https://preview.devplay.online}
       DMRXAI_SANDBOX_IMAGE: ${DMRXAI_SANDBOX_IMAGE:-node:20-alpine}
       E2B_API_KEY: ${E2B_API_KEY:-}
       E2B_TEMPLATE: ${E2B_TEMPLATE:-base}

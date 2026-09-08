@@ -49,7 +49,7 @@ function buildAdapter(provider: SandboxProvider): E2BSdkAdapter | null {
   const workspaceBaseDir =
     process.env.DMRXAI_SANDBOX_DIR?.trim() || "/srv/dmrxai/sandboxes";
   const previewBaseHost =
-    process.env.DMRXAI_PREVIEW_HOST?.trim() || "https://dmrxai.devplay.online";
+    process.env.DMRXAI_PREVIEW_HOST?.trim() || "https://preview.devplay.online";
   const image = process.env.DMRXAI_SANDBOX_IMAGE?.trim() || "node:20-alpine";
 
   log.info("buildAdapter", "Using Docker sandbox backend", {

@@ -146,7 +146,7 @@ class DockerSandbox implements E2BSandbox {
     this.container = container;
     this.sandboxId = container.id;
     this.workspace = opts.workspaceContainerPath ?? DEFAULT_WORKSPACE;
-    this.previewBaseHost = opts.previewBaseHost ?? "https://dmrxai.devplay.online";
+    this.previewBaseHost = opts.previewBaseHost ?? "https://preview.devplay.online";
     this.projectSlug = opts.projectSlug;
 
     this.files = {
