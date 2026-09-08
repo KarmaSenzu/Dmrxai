@@ -457,8 +457,11 @@ export function buildRelevantFiles(
   const entries = Object.entries(existingFiles);
   if (entries.length === 0) return "";
   
-  // For small projects, include all files (capped at content size)
-  const MAX_TOTAL_CHARS = 30000;
+  // For small projects, include all files (capped at content size).
+  // 30k chars was too tight for larger projects — key files (src/App.tsx etc.)
+  // got truncated, so the agent "couldn't see" existing code and regenerated
+  // from scratch. Raise to 60k to cover typical Vite+React projects fully.
+  const MAX_TOTAL_CHARS = 60000;
   let totalChars = 0;
   const included: Array<[string, string]> = [];
   
