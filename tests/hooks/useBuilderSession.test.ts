@@ -263,29 +263,21 @@ describe("useBuilderSession", () => {
     expect(result.current.toolCalls[0].name).toBe("create_file");
   });
 
-  it("send executes client-side tool calls and persists files via syncFiles", async () => {
+  it("send does NOT execute tool calls client-side (server-driven loop)", async () => {
     vi.mocked(getFiles).mockReturnValue({});
-    vi.mocked(executeToolOnFileMap).mockReturnValue({
-      result: "ok",
-      success: true,
-      filesChanged: [{ path: "/x.tsx", content: "y" }],
-    });
 
-    // Round 1: server asks the client to execute one create_file tool call.
-    // Round 2: server returns a final completion with no further tools.
-    vi.mocked(global.fetch)
-      .mockResolvedValueOnce(
-        createMockSSEStream([
-          doneEvent({
-            content: "Creating file",
-            toolCalls: [{ id: "tc-1", name: "create_file", args: { path: "/x.tsx", content: "y" } }],
-            continuation: "client-execute",
-          }),
-        ])
-      )
-      .mockResolvedValueOnce(
-        createMockSSEStream([doneEvent({ content: "All done", continuation: null })])
-      );
+    // The server now drives the full loop, so a single POST returns a stream
+    // that includes tool_call events AND the final done event — the client no
+    // longer re-POSTs or executes tools locally.
+    vi.mocked(global.fetch).mockResolvedValue(
+      createMockSSEStream([
+        {
+          event: "tool_call",
+          data: { id: "tc-1", name: "create_file", args: { path: "/x.tsx", content: "y" } },
+        },
+        doneEvent({ content: "All done", continuation: null }),
+      ])
+    );
 
     const { result } = renderHook(() => useBuilderSession());
 
@@ -297,16 +289,14 @@ describe("useBuilderSession", () => {
       await result.current.send("Create x.tsx", "project-123");
     });
 
-    expect(executeToolOnFileMap).toHaveBeenCalled();
-    expect(syncFiles).toHaveBeenCalledWith(
-      "project-123",
-      expect.objectContaining({ "/x.tsx": "y" })
-    );
-    expect(result.current.filesVersion).toBeGreaterThan(0);
+    // Client no longer executes tools locally.
+    expect(executeToolOnFileMap).not.toHaveBeenCalled();
+    // Single POST (no continuation re-POST).
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    // Tool call surfaced in the activity feed.
+    expect(result.current.toolCalls).toHaveLength(1);
     expect(result.current.phase).toBe("done");
     expect(result.current.isRunning).toBe(false);
-    // fetch should have been called twice (initial round + continuation round).
-    expect(global.fetch).toHaveBeenCalledTimes(2);
   });
 
   it("abort cancels the current run", async () => {

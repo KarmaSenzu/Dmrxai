@@ -60,7 +60,10 @@ export interface E2BSandbox {
 
 /** Adapter interface the SDK loader must satisfy. */
 export interface E2BSdkAdapter {
-  create(template: string, opts?: { timeoutMs?: number }): Promise<E2BSandbox>;
+  create(
+    template: string,
+    opts?: { timeoutMs?: number; projectSlug?: string },
+  ): Promise<E2BSandbox>;
   connect(sandboxId: string): Promise<E2BSandbox>;
 }
 
@@ -221,6 +224,7 @@ export class SandboxManager {
     const sdk = loadSdk();
     const sandbox = await sdk.create(this.template, {
       timeoutMs: this.idleTimeoutMs,
+      projectSlug: projectId,
     });
     const entry: SandboxEntry = {
       sandbox,
