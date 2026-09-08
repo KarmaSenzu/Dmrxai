@@ -213,6 +213,25 @@ describe("url-guard", () => {
         expect(url.hostname).toBe("api.openai.com");
       });
 
+      it("permits http:// to an allowlisted host (production internal proxy)", () => {
+        // Regression: in production, http: used to be blocked BEFORE the
+        // hostname allowlist was consulted, so an allowlisted internal host
+        // (e.g. host.docker.internal AI proxy) still got PROTOCOL_BLOCKED.
+        const url = validateUrl("http://host.docker.internal:20128/v1", {
+          allowedHosts: ["host.docker.internal"],
+        });
+        expect(url.protocol).toBe("http:");
+        expect(url.hostname).toBe("host.docker.internal");
+      });
+
+      it("still blocks http:// to a NON-allowlisted host in production", () => {
+        expect(() =>
+          validateUrl("http://evil.com", {
+            allowedHosts: ["host.docker.internal"],
+          })
+        ).toThrow(UrlGuardError);
+      });
+
       it("permits subdomain match", () => {
         const url = validateUrl("https://eu.api.openai.com/v1", {
           allowedHosts: ["openai.com"],

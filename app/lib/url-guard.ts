@@ -66,10 +66,19 @@ function isPrivateAllowedByDefault(): boolean {
  * Throws UrlGuardError on invalid input.
  */
 export function validateUrl(input: string, options: UrlGuardOptions = {}): URL {
+  const hasAllowedHosts = !!(options.allowedHosts && options.allowedHosts.length > 0);
+
   const {
     protocols = ["https:"],
     allowedHosts,
-    allowHttp = process.env.NODE_ENV !== "production",
+    // When an explicit host allowlist is provided, permit http: for those
+    // hosts — the allowlist already restricts which hosts are reachable, so
+    // allowing http to an allowlisted internal host (e.g. a local AI proxy)
+    // is safe. Without this, production would block http:// BEFORE the
+    // hostname allowlist is even consulted (see PROTOCOL_BLOCKED ordering bug).
+    allowHttp =
+      options.allowHttp ??
+      (process.env.NODE_ENV !== "production" || hasAllowedHosts),
     allowPrivate = isPrivateAllowedByDefault(),
   } = options;
 
