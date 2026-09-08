@@ -402,6 +402,14 @@ export async function POST(req: NextRequest) {
               onStderr: (c) => emitTerminal(c),
             });
 
+            // Notify the client that this tool finished so the Steps panel can
+            // advance (e.g. 3/11) in real time instead of staying 0/N.
+            emit("tool_result", {
+              id: tc.id,
+              success: res.success,
+              result: res.result,
+            });
+
             // Track dev server start: a run_command that launches the dev
             // server (npm run dev / vite / npm start) marks the preview ready.
             const parsed = parseToolCall(tc);

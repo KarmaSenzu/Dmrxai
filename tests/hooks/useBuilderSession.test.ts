@@ -299,6 +299,36 @@ describe("useBuilderSession", () => {
     expect(result.current.isRunning).toBe(false);
   });
 
+  it("updates tool result on tool_result event (Steps panel advances)", async () => {
+    vi.mocked(getFiles).mockReturnValue({});
+
+    vi.mocked(global.fetch).mockResolvedValue(
+      createMockSSEStream([
+        {
+          event: "tool_call",
+          data: { id: "tc-1", name: "create_file", args: { path: "/x.tsx", content: "y" } },
+        },
+        {
+          event: "tool_result",
+          data: { id: "tc-1", success: true, result: "File created: /x.tsx" },
+        },
+        doneEvent({ content: "Done", continuation: null }),
+      ])
+    );
+
+    const { result } = renderHook(() => useBuilderSession());
+    act(() => result.current.setProjectId("project-123"));
+
+    await act(async () => {
+      await result.current.send("Create x.tsx", "project-123");
+    });
+
+    // The tool call now has its result populated (so the Steps panel shows
+    // completed=1 rather than 0).
+    expect(result.current.toolCalls[0].result).toBe("File created: /x.tsx");
+    expect(result.current.toolCalls[0].success).toBe(true);
+  });
+
   it("abort cancels the current run", async () => {
     const mockAbort = vi.fn();
     const originalAbortController = global.AbortController;

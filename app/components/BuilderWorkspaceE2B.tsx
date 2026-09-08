@@ -1486,6 +1486,18 @@ export default function BuilderWorkspaceE2B() {
                     className="absolute inset-0 w-full h-full border-0 bg-white"
                     sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
                   />
+                ) : session.isRunning ? (
+                  // Agent is still building — show a clear "preparing" state
+                  // instead of the blank StackBlitz surface.
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-light-bg dark:bg-dark-bg text-light-muted dark:text-dark-muted px-6 z-10">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10 ring-1 ring-light-border/40 dark:ring-dark-border/40 flex items-center justify-center mb-3">
+                      <Loader2 size={28} className="text-blue-500 dark:text-cyan-400 animate-spin" strokeWidth={1.5} />
+                    </div>
+                    <p className="text-sm font-medium text-light-text dark:text-dark-text mb-1">Menyiapkan preview…</p>
+                    <p className="text-xs opacity-70 text-center max-w-[280px]">
+                      AI sedang membangun aplikasi. Preview akan muncul otomatis setelah selesai.
+                    </p>
+                  </div>
                 ) : (
                   <>
                     {/* StackBlitz mount surface — embedFiles() REPLACES this div

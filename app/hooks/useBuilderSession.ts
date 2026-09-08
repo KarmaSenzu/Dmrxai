@@ -473,6 +473,19 @@ export function useBuilderSession(
                   "Done";
                 break;
               }
+              case "tool_result": {
+                // Update the tool call's result so the Steps panel advances in
+                // real time (e.g. 3/11) instead of staying 0/N.
+                const id = data.id as string;
+                const success = data.success as boolean;
+                const result = data.result as string;
+                setToolCalls((prev) =>
+                  prev.map((tc) =>
+                    tc.id === id ? { ...tc, result, success } : tc,
+                  ),
+                );
+                break;
+              }
               case "preview_ready": {
                 const url = data.url as string;
                 if (url) setPreviewUrl(url);
