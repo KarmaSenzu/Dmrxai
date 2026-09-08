@@ -6,7 +6,6 @@
 #
 # Routing: /<slug> -> container sandbox "dmrxai-sb-<slug>" di network
 # dmrxai-sandbox-net, port 5173 (default Vite dev server).
-# Path-based dipakai karena wildcard multi-level subdomain butuh ACM berbayar.
 
 {
 	auto_https off
@@ -14,8 +13,9 @@
 }
 
 http://preview.devplay.online:8080 {
-	handle /<slug> {
-		reverse_proxy dmrxai-sb-{path.1}:5173 {
+	@preview path_regexp ^\/([^\/]+)\/?
+	handle @preview {
+		reverse_proxy dmrxai-sb-{re.1}:5173 {
 			flush_interval -1
 			header_up X-Forwarded-Host {host}
 			header_up X-Forwarded-Proto https
