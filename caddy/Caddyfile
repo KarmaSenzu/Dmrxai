@@ -1,22 +1,21 @@
-# Caddy — dmrxai preview router
+# Caddy — dmrxai preview router (path-based)
 #
 # Arsitektur: traffic publik masuk via Cloudflare Tunnel (TLS di edge Cloudflare),
-# lalu tunnel meneruskan *.preview.devplay.online ke caddy:8080.
+# lalu tunnel meneruskan preview.devplay.online ke caddy:8080.
 # Karena TLS sudah di-handle Cloudflare, Caddy berjalan HTTP saja.
 #
-# Routing: <slug>.preview.devplay.online -> container sandbox "dmrxai-sb-<slug>"
-# di network dmrxai-sandbox-net, port 5173 (default Vite dev server).
+# Routing: /<slug> -> container sandbox "dmrxai-sb-<slug>" di network
+# dmrxai-sandbox-net, port 5173 (default Vite dev server).
+# Path-based dipakai karena wildcard multi-level subdomain butuh ACM berbayar.
 
 {
 	auto_https off
 	admin off
 }
 
-http://*.preview.devplay.online:8080 {
-	handle {
-		# {labels.3} = label subdomain pertama.
-		# contoh: foo.preview.devplay.online -> dmrxai-sb-foo:5173
-		reverse_proxy dmrxai-sb-{labels.3}:5173 {
+http://preview.devplay.online:8080 {
+	handle /<slug> {
+		reverse_proxy dmrxai-sb-{path.1}:5173 {
 			flush_interval -1
 			header_up X-Forwarded-Host {host}
 			header_up X-Forwarded-Proto https

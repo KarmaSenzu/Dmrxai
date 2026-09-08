@@ -107,23 +107,23 @@ describe("DockerAdapter", () => {
     expect(out.length).toBeGreaterThan(0);
   });
 
-  it("builds a wildcard subdomain preview host from projectSlug", async () => {
+  it("builds a path-based preview URL from projectSlug", async () => {
     const adapter = new DockerAdapter({
       workspaceHostDir: "/srv/dmrxai/sandboxes/proj1",
-      previewBaseHost: "https://dmrxai.devplay.online",
+      previewBaseHost: "https://preview.devplay.online",
     });
     const sandbox = await adapter.create("node", { projectSlug: "proj1" });
-    expect(sandbox.getHost(5173)).toBe("https://proj1.dmrxai.devplay.online");
+    expect(sandbox.getHost(5173)).toBe("https://preview.devplay.online/proj1");
   });
 
-  it("falls back to container id subdomain when no projectSlug", async () => {
+  it("falls back to container id path when no projectSlug", async () => {
     const adapter = new DockerAdapter({
       workspaceHostDir: "/srv/dmrxai/sandboxes/proj1",
-      previewBaseHost: "https://dmrxai.devplay.online",
+      previewBaseHost: "https://preview.devplay.online",
     });
     const sandbox = await adapter.create("node", {});
-    // Without projectSlug, the subdomain is derived from the container id.
-    expect(sandbox.getHost(5173)).toMatch(/^https:\/\/container-\d+\.dmrxai\.devplay\.online$/);
+    // Without projectSlug, the path segment is derived from the container id.
+    expect(sandbox.getHost(5173)).toMatch(/^https:\/\/preview\.devplay\.online\/container-\d+$/);
   });
 
   it("connect() returns a sandbox for an existing container id", async () => {

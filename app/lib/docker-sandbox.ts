@@ -240,13 +240,13 @@ class DockerSandbox implements E2BSandbox {
   }
 
   getHost(port: number): string {
-    // Wildcard subdomain pattern: https://<slug>.<base>
-    // The reverse proxy (Caddy/Traefik) maps *.dmrxai.devplay.online to this
-    // container's dev-server port. If no projectSlug is provided, fall back to
-    // the container id so the URL is always unique.
-    const base = this.previewBaseHost.replace(/^https?:\/\//, "").replace(/\/+$/, "");
+    // Path-based preview: https://preview.devplay.online/<slug>
+    // (wildcard multi-level subdomains need paid ACM on Cloudflare, so we use a
+    // single level-1 host + path routing instead). If no projectSlug, fall back
+    // to the container id so the URL is always unique.
+    const base = this.previewBaseHost.replace(/\/+$/, "");
     const slug = this.projectSlug ?? this.sandboxId.slice(0, 12);
-    return `https://${slug}.${base}`;
+    return `${base}/${slug}`;
   }
 
   async kill(): Promise<unknown> {
