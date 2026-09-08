@@ -23,6 +23,10 @@ import "server-only";
 
 import { createLogger } from "@/lib/logger";
 import type { E2BSandbox, E2BSdkAdapter, SandboxFs, SandboxProcess } from "@/lib/e2b-sandbox";
+// Static import (not dynamic require) — Next.js standalone tracing includes
+// dockerode when imported statically, and webpack ESM bundles don't expose a
+// global `require` that `new Function("require")` could reach.
+import Docker from "dockerode";
 
 const log = createLogger("docker-sandbox");
 
@@ -107,15 +111,13 @@ function loadDockerClient(): DockerClient {
   clientInitTried = true;
 
   try {
-    const dynamicRequire = new Function("m", "return require(m)") as (
-      m: string,
-    ) => unknown;
-    const Docker = dynamicRequire("dockerode") as
-      | { default?: new (opts?: unknown) => DockerClient }
-      | (new (opts?: unknown) => DockerClient);
+    // dockerode's default export is the constructor. It may be ESM- or
+    // CJS-interop shaped depending on the bundler, so handle both.
+    const Ctor = (Docker as unknown as {
+      default?: new (opts?: unknown) => DockerClient;
+    }).default ?? (Docker as unknown as new (opts?: unknown) => DockerClient);
 
-    const Ctor = typeof Docker === "function" ? Docker : Docker?.default;
-    if (!Ctor) {
+    if (typeof Ctor !== "function") {
       throw new Error("dockerode loaded but no constructor found");
     }
     loadedClient = new Ctor();
