@@ -130,6 +130,12 @@ export function useBuilderSession(
     toolCallsRef.current = toolCalls;
   }, [toolCalls]);
 
+  // Mirror of messages so `send` can read the full conversation history.
+  const messagesRef = useRef<AgentMessage[]>([]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
   // Keep userId/settings in refs so the long-lived `send` closure can read the
   // current values without listing them as deps.
   const userIdRef = useRef<string | null>(userId);
@@ -309,10 +315,22 @@ export function useBuilderSession(
 
       try {
         const liveSettings = settingsRef.current;
+
+        // Send prior conversation history (excluding the just-added user +
+        // placeholder assistant messages) so the agent keeps context across
+        // turns instead of restarting from "Mau bikin apa?" every prompt.
+        const priorMessages = messagesRef.current
+          .filter((m) => m.role === "user" || m.role === "assistant")
+          .map((m) => ({
+            role: m.role,
+            content: m.content,
+          }));
+
         const body: Record<string, unknown> = {
           projectId: runPid,
           prompt,
           model: modelOverride || liveSettings.model || "kr/claude-haiku-4.5",
+          history: priorMessages,
         };
         if (overrideMode) body.mode = overrideMode;
 

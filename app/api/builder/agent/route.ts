@@ -222,6 +222,21 @@ export async function POST(req: NextRequest) {
 
   const planMarkdown = typeof body.planMarkdown === "string" ? body.planMarkdown : null;
 
+  // Prior conversation history sent by the client (user/assistant turns).
+  const history: Array<{ role: "user" | "assistant"; content: string }> =
+    Array.isArray(body.history)
+      ? (body.history as Array<{ role: string; content: string }>)
+          .filter(
+            (h) =>
+              h &&
+              typeof h.role === "string" &&
+              (h.role === "user" || h.role === "assistant") &&
+              typeof h.content === "string",
+          )
+          .slice(-20) // cap to avoid unbounded context
+          .map((h) => ({ role: h.role as "user" | "assistant", content: h.content }))
+      : [];
+
   const requestedMode =
     typeof body.mode === "string" &&
     ["architect", "code", "debug"].includes(body.mode as string)
@@ -332,7 +347,7 @@ export async function POST(req: NextRequest) {
           mode,
           projectPlan: planMarkdown ?? undefined,
           existingFiles: hasFiles ? existingFilesMap : undefined,
-          history: [],
+          history,
         });
         for (const m of built) {
           messages.push({ role: m.role, content: m.content });
