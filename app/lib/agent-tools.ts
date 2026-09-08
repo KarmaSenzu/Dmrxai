@@ -377,6 +377,16 @@ export function detectMode(args: {
     return "code";
   }
 
+  // Build-now signals — user explicitly wants the AI to start building right
+  // away (imperative "buatkan/eksekusi/langsung buat"), rather than just
+  // brainstorming. Even on a fresh project, this should skip architect and go
+  // straight to code mode, otherwise the agent gets stuck asking questions.
+  const buildNowKeywords = /\b(buatkan|buatin|bikinin|bangun|build|eksekusi|execute|langsung\s*buat|tolong\s*buat|mulai\s*buat|bikin\s*sekarang|buat\s*sekarang|jadiin|kerjakan|implementasikan)\b/i;
+  if (buildNowKeywords.test(lower)) {
+    log.debug("detectMode", "Detected code mode (build-now intent)", { hasFiles: args.hasFiles, hasPlan: args.hasPlan });
+    return "code";
+  }
+
   // Empty project + no plan → architect (planning phase).
   if (!args.hasFiles && !args.hasPlan) {
     log.debug("detectMode", "Detected architect mode", { hasFiles: args.hasFiles, hasPlan: args.hasPlan });

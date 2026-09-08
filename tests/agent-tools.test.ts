@@ -6,9 +6,19 @@ import {
 } from "@/lib/agent-tools";
 
 describe("detectMode", () => {
-  it("returns architect for new project (no files, no plan)", () => {
+  it("returns code for build-now intent even on a new project", () => {
+    // "buatkan" is an imperative build-now signal; the agent should start
+    // building immediately, not get stuck in architect asking questions.
     expect(
       detectMode({ hasFiles: false, prompt: "buatkan todo app", hasPlan: false }),
+    ).toBe("code");
+  });
+
+  it("returns architect for a new project without build-now intent", () => {
+    // A brainstorming question (no imperative "buatkan/eksekusi") should stay
+    // in architect mode to plan first.
+    expect(
+      detectMode({ hasFiles: false, prompt: "mau bikin apa ya?", hasPlan: false }),
     ).toBe("architect");
   });
 
