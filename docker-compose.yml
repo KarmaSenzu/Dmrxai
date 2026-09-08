@@ -33,6 +33,12 @@ services:
       PORT: "3000"
       HOSTNAME: 0.0.0.0
       TZ: ${TZ:-Asia/Jakarta}
+      # Supabase (client-side, prefix NEXT_PUBLIC_ — safe for browser).
+      # Service role key is NOT exposed here (server-only, set via .env).
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+      # Server-only Supabase service role key (never sent to browser).
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
       # AI Backend — server-side hardcoded.
       # User TIDAK bisa override dari Settings UI; semua request keluar
       # pakai AI_API_KEY ini ke 9router internal.
