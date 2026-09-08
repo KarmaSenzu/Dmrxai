@@ -191,7 +191,7 @@ export function useBuilderSession(
         streamPersistTimerRef.current = null;
       }
 
-      const msgId = streamingAssistantIdRef.current ?? `${Date.now()}-a`;
+      const msgId = streamingAssistantIdRef.current ?? crypto.randomUUID();
       const allMessages = getLocalMessages(pid);
       const finalMsg: BuilderProjectMessage = {
         id: msgId,
@@ -277,7 +277,7 @@ export function useBuilderSession(
 
       // Add user message.
       const userMsg: AgentMessage = {
-        id: `${Date.now()}-u`,
+        id: crypto.randomUUID(),
         role: "user",
         content: prompt,
         timestamp: Date.now(),
@@ -292,7 +292,7 @@ export function useBuilderSession(
 
       // Add placeholder assistant message.
       const assistantMsg: AgentMessage = {
-        id: `${Date.now()}-a`,
+        id: crypto.randomUUID(),
         role: "assistant",
         content: "",
         timestamp: Date.now(),
@@ -631,7 +631,7 @@ export function useBuilderSession(
           }));
 
           return {
-            id: m.id ?? `${Date.now()}-${Math.random()}`,
+            id: m.id ?? crypto.randomUUID(),
             role: m.role as "user" | "assistant",
             content: m.content,
             timestamp: ts,
