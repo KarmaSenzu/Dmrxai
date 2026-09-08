@@ -458,11 +458,11 @@ export function buildRelevantFiles(
   if (entries.length === 0) return "";
   
   // For small projects, include all files (capped at content size).
-  // Keep the cap generous (~100k chars ≈ 25k tokens) so typical projects are
-  // fully visible to the agent without truncating key files. Beyond this we
-  // rely on scoring to pick the most relevant files rather than growing the
-  // context unbounded (which would risk exceeding the model's context window).
-  const MAX_TOTAL_CHARS = 100000;
+  // 150k chars (~37k tokens) comfortably covers large/complex projects while
+  // staying safely under typical model context windows (e.g. ~200k tokens).
+  // Going "unlimited" would exceed the model's context and break the request,
+  // so we cap here and rely on scoring to pick the most relevant files beyond.
+  const MAX_TOTAL_CHARS = 150000;
   let totalChars = 0;
   const included: Array<[string, string]> = [];
   
