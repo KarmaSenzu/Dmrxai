@@ -341,6 +341,10 @@ export async function POST(req: NextRequest) {
         let round = 0;
         let finalSummary = "";
         let sawDone = false;
+        // Whether a dev server (npm run dev / vite) was actually started in the
+        // sandbox. We only emit preview_ready when this is true, so we never
+        // point the iframe at a port with nothing listening (which caused 502).
+        let devServerStarted = false;
 
         while (!sawDone && round < MAX_ROUNDS) {
           round++;
@@ -380,6 +384,17 @@ export async function POST(req: NextRequest) {
               onStdout: (c) => emitTerminal(c),
               onStderr: (c) => emitTerminal(c),
             });
+
+            // Track dev server start: a run_command that launches the dev
+            // server (npm run dev / vite / npm start) marks the preview ready.
+            const parsed = parseToolCall(tc);
+            if (parsed?.name === "run_command") {
+              const cmd = (parsed.args as { command?: string }).command ?? "";
+              if (/(npm run dev|npm run start|vite|npm start|npm run preview)/i.test(cmd)) {
+                devServerStarted = true;
+              }
+            }
+
             messages.push({
               role: "tool",
               tool_call_id: tc.id,
@@ -396,10 +411,10 @@ export async function POST(req: NextRequest) {
           emitTerminal(`\n⚠ Max ${MAX_ROUNDS} rounds reached`);
         }
 
-        // Emit preview URL once the sandbox has a dev server. The wildcard
-        // subdomain (https://<slug>.<base>) is provided by getHost(); the
-        // reverse proxy routes it to the sandbox's dev-server port.
-        if (sandbox) {
+        // Emit preview URL only when a dev server was actually started in the
+        // sandbox. Architect mode (plan-only, no files) never starts a dev
+        // server, so it must not emit a preview that would 502.
+        if (sandbox && devServerStarted) {
           const previewUrl = sandbox.getHost(5173);
           emit("preview_ready", { url: previewUrl });
           log.debug("POST", "preview_ready", { previewUrl });
