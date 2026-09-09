@@ -12,13 +12,18 @@ ALTER TABLE project_files DISABLE ROW LEVEL SECURITY;
 ALTER TABLE project_messages DISABLE ROW LEVEL SECURITY;
 
 -- 2. Drop every known policy on the builder tables (001/002/003 + any
---    out-of-band ones like projects_self). IF EXISTS keeps this idempotent.
+--    out-of-band ones like projects_self / "Allow all ..."). IF EXISTS keeps
+--    this idempotent. The "Allow all ..." policies are the dangerous permissive
+--    ones (USING true) that must go.
 DROP POLICY IF EXISTS "Users can CRUD own projects" ON projects;
 DROP POLICY IF EXISTS "Users can CRUD own project files" ON project_files;
 DROP POLICY IF EXISTS "Users can CRUD own project messages" ON project_messages;
 DROP POLICY IF EXISTS projects_self ON projects;
 DROP POLICY IF EXISTS project_files_self ON project_files;
 DROP POLICY IF EXISTS project_msgs_self ON project_messages;
+DROP POLICY IF EXISTS "Allow all projects" ON projects;
+DROP POLICY IF EXISTS "Allow all project_files" ON project_files;
+DROP POLICY IF EXISTS "Allow all project_messages" ON project_messages;
 
 -- 3. Convert projects.user_id from TEXT to UUID.
 ALTER TABLE projects
