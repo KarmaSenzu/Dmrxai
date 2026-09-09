@@ -49,8 +49,29 @@ export interface BuilderProjectData {
 
 // ---- Constants ----
 
-const STORAGE_KEY = "dmrxai:builder:projects";
-const LAST_OPENED_KEY = "dmrxai:builder:lastOpenedProjectId";
+// localStorage keys are namespaced per authenticated user so one user's cached
+// chat/projects can't leak to another user sharing the same browser.
+const BASE_KEY = "dmrxai:builder";
+let currentUserId: string | null = null;
+
+/** Set the active user id. All subsequent localStorage reads/writes are scoped
+ *  to this user. Call this as soon as the authenticated user is known. */
+export function setCurrentUserId(userId: string | null): void {
+  currentUserId = userId;
+}
+
+function storageKey(): string {
+  return currentUserId
+    ? `${BASE_KEY}:${currentUserId}:projects`
+    : `${BASE_KEY}:projects`;
+}
+
+function lastOpenedKey(): string {
+  return currentUserId
+    ? `${BASE_KEY}:${currentUserId}:lastOpenedProjectId`
+    : `${BASE_KEY}:lastOpenedProjectId`;
+}
+
 const MAX_PROJECTS = 30;
 const MAX_FILES_PER_PROJECT = 100;
 const MAX_FILE_SIZE = 100_000; // 100KB per file
@@ -60,7 +81,7 @@ const MAX_FILE_SIZE = 100_000; // 100KB per file
 function loadAll(): BuilderProjectData[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey());
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -99,7 +120,7 @@ function saveAll(data: BuilderProjectData[]): boolean {
   }
 
   try {
-    localStorage.setItem(STORAGE_KEY, json);
+    localStorage.setItem(storageKey(), json);
     return true;
   } catch (e) {
     // Quota exceeded — prune oldest 30% (by updatedAt, since trimmed is
@@ -111,7 +132,7 @@ function saveAll(data: BuilderProjectData[]): boolean {
       const dropCount = Math.max(1, Math.floor(trimmed.length * 0.3));
       const pruned = trimmed.slice(0, trimmed.length - dropCount);
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(pruned));
+        localStorage.setItem(storageKey(), JSON.stringify(pruned));
         console.warn(`[BUILDER-STORAGE] Quota hit, pruned ${dropCount} oldest projects`);
         return true;
       } catch {
@@ -236,7 +257,7 @@ export function syncFiles(projectId: string, files: Record<string, string>): voi
 export function getStorageSize(): number {
   if (typeof window === "undefined") return 0;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) ?? "";
+    const raw = localStorage.getItem(storageKey()) ?? "";
     return raw.length * 2; // UTF-16
   } catch {
     return 0;
@@ -246,7 +267,7 @@ export function getStorageSize(): number {
 export function clearAllProjects(): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(storageKey());
   } catch {
     // ignore
   }
@@ -255,7 +276,7 @@ export function clearAllProjects(): void {
 export function getLastOpenedProjectId(): string | null {
   if (typeof window === "undefined") return null;
   try {
-    return localStorage.getItem(LAST_OPENED_KEY);
+    return localStorage.getItem(lastOpenedKey());
   } catch {
     return null;
   }
@@ -265,9 +286,9 @@ export function setLastOpenedProjectId(id: string | null): void {
   if (typeof window === "undefined") return;
   try {
     if (id) {
-      localStorage.setItem(LAST_OPENED_KEY, id);
+      localStorage.setItem(lastOpenedKey(), id);
     } else {
-      localStorage.removeItem(LAST_OPENED_KEY);
+      localStorage.removeItem(lastOpenedKey());
     }
   } catch {
     // ignore

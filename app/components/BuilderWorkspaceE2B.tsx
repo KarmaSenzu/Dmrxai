@@ -70,7 +70,7 @@ import {
   getFullProjectData,
   getLastOpenedProjectId,
   setLastOpenedProjectId,
-  clearAllProjects,
+  setCurrentUserId,
   getFiles as getLocalFiles,
   type BuilderProject,
   type BuilderProjectMessage,
@@ -665,23 +665,12 @@ export default function BuilderWorkspaceE2B() {
     };
   }, []);
 
-  // Guard against cross-user leakage in the same browser. localStorage is
-  // per-origin (not per-user), so when the authenticated user changes, wipe the
-  // previous user's cached builder data before hydrating the new user's data
-  // from Supabase (which is already RLS-scoped).
+  // Scope localStorage to the authenticated user. Each user gets their own
+  // namespaced cache, so switching accounts in the same browser never leaks the
+  // previous user's data (and returning to a previous account restores its
+  // cache without a refetch).
   useEffect(() => {
-    if (!userId) return;
-    const key = "dmrxai:builder:activeUserId";
-    try {
-      const prev = localStorage.getItem(key);
-      if (prev && prev !== userId) {
-        clearAllProjects();
-        setLastOpenedProjectId(null);
-      }
-      localStorage.setItem(key, userId);
-    } catch {
-      // ignore storage errors
-    }
+    setCurrentUserId(userId ?? null);
   }, [userId]);
 
   // Hydrate from Supabase once we know the user. DB is treated as the
