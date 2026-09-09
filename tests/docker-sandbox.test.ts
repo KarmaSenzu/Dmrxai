@@ -55,6 +55,9 @@ function makeFakeClient(): DockerClient & { created: string[] } {
     getContainer(id) {
       return makeFakeContainer(id, new Map());
     },
+    async listContainers() {
+      return [];
+    },
   };
 }
 

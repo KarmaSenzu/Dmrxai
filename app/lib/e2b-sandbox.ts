@@ -65,6 +65,12 @@ export interface E2BSdkAdapter {
     opts?: { timeoutMs?: number; projectSlug?: string },
   ): Promise<E2BSandbox>;
   connect(sandboxId: string): Promise<E2BSandbox>;
+  /**
+   * Reconnect to an existing sandbox by its deterministic name (optional).
+   * Returns null if not found. Used to recover a sandbox after an app restart
+   * when the in-memory manager lost its reference but the container is alive.
+   */
+  connectByName?(name: string): Promise<E2BSandbox | null>;
 }
 
 // ---------------------------------------------------------------------------
@@ -232,6 +238,37 @@ export class SandboxManager {
     }
 
     const sdk = loadSdk();
+
+    // Before creating a new container, try to reconnect to an existing one by
+    // its deterministic name (dmrxai-sb-<projectId>). This recovers a sandbox
+    // after an app restart (when the in-memory map was lost) instead of failing
+    // with a 409 "name already in use" conflict.
+    if (sdk.connectByName) {
+      try {
+        const existingByName = await sdk.connectByName(`dmrxai-sb-${projectId}`);
+        if (existingByName) {
+          const entry: SandboxEntry = {
+            sandbox: existingByName,
+            projectId,
+            userId,
+            createdAt: Date.now(),
+            lastUsedAt: Date.now(),
+          };
+          this.entries.set(key, entry);
+          log.info("getOrCreate", "Reconnected to existing sandbox", {
+            sandboxId: existingByName.sandboxId,
+            projectId,
+          });
+          return existingByName;
+        }
+      } catch (e) {
+        log.warn("getOrCreate", "connectByName failed, falling back to create", {
+          projectId,
+          error: String(e),
+        });
+      }
+    }
+
     const sandbox = await sdk.create(this.template, {
       timeoutMs: this.idleTimeoutMs,
       projectSlug: projectId,

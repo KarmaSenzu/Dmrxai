@@ -52,6 +52,8 @@ export interface DockerExec {
 export interface DockerClient {
   createContainer(opts: Record<string, unknown>): Promise<DockerContainer>;
   getContainer(id: string): DockerContainer;
+  /** List containers (all states) so we can find an existing sandbox by name. */
+  listContainers(opts: { all?: boolean }): Promise<Array<{ Id: string; Names?: string[] }>>;
 }
 
 /** Options that shape how a sandbox container is created. */
@@ -349,6 +351,23 @@ export class DockerAdapter implements E2BSdkAdapter {
   async connect(sandboxId: string): Promise<E2BSandbox> {
     const client = loadDockerClient();
     const container = client.getContainer(sandboxId);
+    return new DockerSandbox(container, this.opts);
+  }
+
+  /**
+   * Reconnect to an existing sandbox container by its deterministic name
+   * (dmrxai-sb-<slug>). Returns null if no such container exists. Used after an
+   * app restart, when the in-memory SandboxManager has lost its reference but
+   * the Docker container is still alive (within the 3-day TTL).
+   */
+  async connectByName(name: string): Promise<E2BSandbox | null> {
+    const client = loadDockerClient();
+    const containers = await client.listContainers({ all: true });
+    const found = containers.find((c) =>
+      (c.Names ?? []).some((n) => n === `/${name}` || n === name),
+    );
+    if (!found) return null;
+    const container = client.getContainer(found.Id);
     return new DockerSandbox(container, this.opts);
   }
 }
