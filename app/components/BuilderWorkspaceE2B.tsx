@@ -696,6 +696,7 @@ export default function BuilderWorkspaceE2B() {
   }, [session.terminalLogs]);
 
   useEffect(() => {
+    let changed = false;
     for (const tc of session.toolCalls) {
       if (
         (tc.name === "create_file" || tc.name === "edit_file") &&
@@ -703,6 +704,7 @@ export default function BuilderWorkspaceE2B() {
         tc.args.path &&
         tc.args.content
       ) {
+        changed = true;
         setLocalFiles((prev) => {
           const next = {
             ...prev,
@@ -717,7 +719,12 @@ export default function BuilderWorkspaceE2B() {
         });
       }
     }
-  }, [session.toolCalls, session.projectId, syncLocalFiles]);
+    // After files change, persist them to Supabase too (debounced) so the
+    // project state survives even if the sandbox container is destroyed.
+    if (changed && session.projectId) {
+      scheduleDBSync(session.projectId);
+    }
+  }, [session.toolCalls, session.projectId, syncLocalFiles, scheduleDBSync]);
 
   // Auto-switch to the preview tab when a run finishes. StackBlitz drives the
   // live preview now, so the switch only depends on the run phase.
