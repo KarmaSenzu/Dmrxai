@@ -44,6 +44,8 @@ import {
   Folder,
   FolderOpen,
   X,
+  Download,
+  Upload,
 } from "lucide-react";
 import { Highlight, themes } from "prism-react-renderer";
 import {
@@ -917,6 +919,13 @@ export default function BuilderWorkspaceE2B() {
     [session, userId],
   );
 
+  const handleExport = useCallback(() => {
+    const pid = session.projectId;
+    if (!pid) return;
+    // Trigger a browser download of the project's .zip via the export endpoint.
+    window.location.href = `/api/builder/projects/${pid}/export`;
+  }, [session.projectId]);
+
   const handleSelectProject = useCallback(
     (id: string) => {
       console.log("[WS] handleSelectProject:", id);
@@ -964,6 +973,40 @@ export default function BuilderWorkspaceE2B() {
     },
     [session, settings.model],
   );
+
+  const handleImport = useCallback(() => {
+    // Open a hidden file input for .zip upload.
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".zip,application/zip";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch("/api/builder/projects/import", {
+          method: "POST",
+          body: fd,
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: "Import failed" }));
+          alert(`Import gagal: ${(err as { error?: string }).error || "unknown"}`);
+          return;
+        }
+        const data = (await res.json()) as { project?: { id: string } };
+        if (data.project?.id) {
+          // Refresh project list + open the imported project.
+          setProjects(getProjects());
+          handleSelectProject(data.project.id);
+        }
+      } catch (e) {
+        console.error("[BUILDER] import failed:", e);
+        alert("Import gagal.");
+      }
+    };
+    input.click();
+  }, [handleSelectProject]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1047,6 +1090,25 @@ export default function BuilderWorkspaceE2B() {
             >
               <Plus size={13} strokeWidth={2.5} />
               New Project
+            </button>
+          </div>
+
+          {/* Export / Import */}
+          <div className="px-3 pb-2 flex gap-1.5">
+            <button
+              onClick={handleExport}
+              disabled={!session.projectId}
+              className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-medium text-light-text dark:text-dark-text bg-light-input dark:bg-dark-input border border-light-border/50 dark:border-dark-border/50 hover:bg-light-hover dark:hover:bg-dark-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <Download size={12} />
+              Export
+            </button>
+            <button
+              onClick={handleImport}
+              className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-medium text-light-text dark:text-dark-text bg-light-input dark:bg-dark-input border border-light-border/50 dark:border-dark-border/50 hover:bg-light-hover dark:hover:bg-dark-hover transition-colors"
+            >
+              <Upload size={12} />
+              Import
             </button>
           </div>
 
