@@ -38,6 +38,10 @@ services:
       PORT: "3000"
       HOSTNAME: 0.0.0.0
       TZ: ${TZ:-Asia/Jakarta}
+      # Public app origin, used at runtime for server-side redirects (OAuth
+      # callback, auth) so they always go to the canonical host instead of the
+      # client's Host header (which could be 0.0.0.0 in some setups).
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-}
       # Supabase (client-side, prefix NEXT_PUBLIC_ — safe for browser).
       # Service role key is NOT exposed here (server-only, set via .env).
       NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
