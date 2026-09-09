@@ -703,13 +703,21 @@ export default function BuilderWorkspaceE2B() {
         tc.args.path &&
         tc.args.content
       ) {
-        setLocalFiles((prev) => ({
-          ...prev,
-          [tc.args.path as string]: tc.args.content as string,
-        }));
+        setLocalFiles((prev) => {
+          const next = {
+            ...prev,
+            [tc.args.path as string]: tc.args.content as string,
+          };
+          // Persist to localStorage too, so the file survives a refresh and
+          // re-appears in the Code tab (and can sync to Supabase).
+          if (session.projectId) {
+            syncLocalFiles(session.projectId, next);
+          }
+          return next;
+        });
       }
     }
-  }, [session.toolCalls]);
+  }, [session.toolCalls, session.projectId, syncLocalFiles]);
 
   // Auto-switch to the preview tab when a run finishes. StackBlitz drives the
   // live preview now, so the switch only depends on the run phase.

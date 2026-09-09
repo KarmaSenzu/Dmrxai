@@ -17,6 +17,10 @@ http://preview.devplay.online:8080 {
 	handle @preview {
 		reverse_proxy dmrxai-sb-{re.1}:5173 {
 			flush_interval -1
+			# Vite dev server blocks non-localhost Host headers by default.
+			# Rewrite Host to localhost so Vite accepts the request; keep the
+			# original host in X-Forwarded-Host for the app if it needs it.
+			header_up Host localhost
 			header_up X-Forwarded-Host {host}
 			header_up X-Forwarded-Proto https
 		}
