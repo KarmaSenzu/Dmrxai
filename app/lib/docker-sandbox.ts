@@ -301,6 +301,13 @@ export class DockerAdapter implements E2BSdkAdapter {
       Cmd: ["sleep", "infinity"], // keep alive; agent drives it via exec
       WorkingDir: workspace,
       ExposedPorts: { "5173/tcp": {} },
+      Env: [
+        // ReadonlyRootfs makes /root/.npm unwritable, which broke `npm install`
+        // with ENOENT. Point npm's cache at the writable /workspace mount, and
+        // give node/npm a writable HOME there too.
+        "NPM_CONFIG_CACHE=/workspace/.npm",
+        "HOME=/workspace",
+      ],
       Labels: {
         "dmrxai.sandbox": "true",
         "dmrxai.project_slug": projectSlug ?? "",
@@ -313,6 +320,11 @@ export class DockerAdapter implements E2BSdkAdapter {
         NanoCpus: this.opts.cpus ? Math.floor(parseFloat(this.opts.cpus) * 1e9) : 500_000_000,
         PidsLimit: this.opts.pidsLimit ?? 128,
         ReadonlyRootfs: true,
+        // Writable scratch dirs needed by npm/node despite read-only rootfs.
+        Tmpfs: {
+          "/tmp": "rw,noexec,nosuid,size=256m",
+          "/root/.npm": "rw,noexec,nosuid,size=256m",
+        },
         CapDrop: ["ALL"],
         SecurityOpt: ["no-new-privileges:true"],
         NetworkMode: "dmrxai-sandbox-net",
