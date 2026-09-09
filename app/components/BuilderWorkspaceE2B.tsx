@@ -70,6 +70,7 @@ import {
   getFullProjectData,
   getLastOpenedProjectId,
   setLastOpenedProjectId,
+  clearAllProjects,
   getFiles as getLocalFiles,
   type BuilderProject,
   type BuilderProjectMessage,
@@ -663,6 +664,25 @@ export default function BuilderWorkspaceE2B() {
       cancelled = true;
     };
   }, []);
+
+  // Guard against cross-user leakage in the same browser. localStorage is
+  // per-origin (not per-user), so when the authenticated user changes, wipe the
+  // previous user's cached builder data before hydrating the new user's data
+  // from Supabase (which is already RLS-scoped).
+  useEffect(() => {
+    if (!userId) return;
+    const key = "dmrxai:builder:activeUserId";
+    try {
+      const prev = localStorage.getItem(key);
+      if (prev && prev !== userId) {
+        clearAllProjects();
+        setLastOpenedProjectId(null);
+      }
+      localStorage.setItem(key, userId);
+    } catch {
+      // ignore storage errors
+    }
+  }, [userId]);
 
   // Hydrate from Supabase once we know the user. DB is treated as the
   // authoritative source: we merge DB rows into local cache so the sidebar
