@@ -978,6 +978,23 @@ export default function BuilderWorkspaceE2B() {
         setPreferredMode("auto");
         setProjectModel(settings.model ?? "");
       }
+
+      // Reconcile files from the live sandbox (source of truth). After an app
+      // restart the localStorage cache may be stale/empty while the container
+      // still has the real files, so fetch fresh and overwrite the cache.
+      (async () => {
+        try {
+          const res = await fetch(`/api/builder/projects/${id}/files`);
+          if (!res.ok) return;
+          const payload = (await res.json()) as { files?: Record<string, string> };
+          if (payload.files && Object.keys(payload.files).length > 0) {
+            setLocalFiles(payload.files);
+            syncLocalFiles(id, payload.files);
+          }
+        } catch (e) {
+          console.warn("[WS] Failed to fetch sandbox files:", e);
+        }
+      })();
     },
     [session, settings.model],
   );
